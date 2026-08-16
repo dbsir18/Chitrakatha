@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, ImageIcon, LayoutGrid, Sparkles } from "lucide-react";
+import { Download, ImageIcon, LayoutGrid, Loader2, Sparkles } from "lucide-react";
 import { getLesson } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImagePoller } from "@/components/image-poller";
 import { cn } from "@/lib/utils";
 
 const CONTENT_TYPE_LABEL: Record<string, string> = {
@@ -42,6 +43,8 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
         </h1>
       </div>
 
+      {/* Scene image — shows skeleton + poller while images are being painted */}
+      {!lesson.sceneImageUrl && <ImagePoller />}
       <div className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-border bg-secondary shadow-sm">
         {lesson.sceneImageUrl ? (
           <Image
@@ -53,8 +56,9 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
             priority
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <ImageIcon className="size-10" strokeWidth={1.5} />
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Loader2 className="size-7 animate-spin" strokeWidth={1.5} />
+            <p className="text-sm">Painting the scene — usually 2–4 minutes…</p>
           </div>
         )}
       </div>

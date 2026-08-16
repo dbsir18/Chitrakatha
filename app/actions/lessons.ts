@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { designScene } from "@/lib/ai/scene-designer";
@@ -51,6 +52,11 @@ export async function generateLesson(
         .map((r) => [r.symbol.conceptKey, r.embedding as number[]])
     );
 
+    // ── Phase 1: save text content immediately, redirect user now ────────────
+    // Image generation (scene + symbols) is expensive (5–12 min for large
+    // lessons). We save the lesson with all text content first so the user
+    // can read the narrative and legend right away, then fire images in the
+    // background via after() so the HTTP response isn't held open.
     const lesson = await db.lesson.create({
       data: {
         topic: trimmedTopic,
@@ -60,8 +66,9 @@ export async function generateLesson(
         setting: design.setting,
         narrative: design.narrative,
         sceneImagePrompt: design.sceneImagePrompt,
-        symbols: hydratedSymbols,
+        symbols: hydratedSymbols, // no imageUrl yet — added after image gen
         quizQuestions: design.quizQuestions,
+        sceneImageUrl: null, // signals "images pending" to the lesson page
       },
     });
 
@@ -76,56 +83,60 @@ export async function generateLesson(
       ])
     );
 
-    const [sceneImageUrl, resolvedSymbols] = await Promise.all([
-      generateSceneImage(lesson.id, design.setting, hydratedSymbols).catch((err) => {
-        console.error("Scene image generation failed:", err);
-        return null;
-      }),
-      resolveSymbolImages(hydratedSymbols, lookup),
-    ]);
+    // ── Phase 2: image generation runs after the response is sent ────────────
+    // The lesson page polls (router.refresh every 8s) until sceneImageUrl
+    // is no longer null, then shows the painted scene.
+    after(async () => {
+      try {
+        const [sceneImageUrl, resolvedSymbols] = await Promise.all([
+          generateSceneImage(lesson.id, design.setting, hydratedSymbols).catch((err) => {
+            console.error("Scene image generation failed:", err);
+            return null;
+          }),
+          resolveSymbolImages(hydratedSymbols, lookup),
+        ]);
 
-    const symbolsWithImages: SymbolWithImage[] = resolvedSymbols.map((r) => ({
-      ...r.symbol,
-      imageUrl: r.imageUrl,
-    }));
+        const symbolsWithImages: SymbolWithImage[] = resolvedSymbols.map((r) => ({
+          ...r.symbol,
+          imageUrl: r.imageUrl,
+        }));
 
-    await Promise.all(
-      resolvedSymbols.map((r) => {
-        if (r.isNewLibraryEntry && r.imageUrl) {
-          return db.symbolLibrary.upsert({
-            where: { conceptKey: r.symbol.conceptKey },
-            create: {
-              conceptKey: r.symbol.conceptKey,
-              displayName: r.symbol.name,
-              description: r.symbol.visualDescription,
-              imagePrompt: r.symbol.imagePrompt,
-              category: r.symbol.category,
-              referenceImageUrl: r.imageUrl,
-              embedding: newConceptEmbeddings.get(r.symbol.conceptKey) ?? undefined,
-            },
-            update: {
-              referenceImageUrl: r.imageUrl,
-            },
-          });
-        }
-        if (!r.isNewLibraryEntry && r.imageUrl) {
-          return db.symbolLibrary
-            .update({
-              where: { conceptKey: r.symbol.conceptKey },
-              data: { usageCount: { increment: 1 } },
-            })
-            .catch(() => undefined);
-        }
-        return Promise.resolve();
-      })
-    );
+        await Promise.all(
+          resolvedSymbols.map((r) => {
+            if (r.isNewLibraryEntry && r.imageUrl) {
+              return db.symbolLibrary.upsert({
+                where: { conceptKey: r.symbol.conceptKey },
+                create: {
+                  conceptKey: r.symbol.conceptKey,
+                  displayName: r.symbol.name,
+                  description: r.symbol.visualDescription,
+                  imagePrompt: r.symbol.imagePrompt,
+                  category: r.symbol.category,
+                  referenceImageUrl: r.imageUrl,
+                  embedding: newConceptEmbeddings.get(r.symbol.conceptKey) ?? undefined,
+                },
+                update: { referenceImageUrl: r.imageUrl },
+              });
+            }
+            if (!r.isNewLibraryEntry && r.imageUrl) {
+              return db.symbolLibrary
+                .update({
+                  where: { conceptKey: r.symbol.conceptKey },
+                  data: { usageCount: { increment: 1 } },
+                })
+                .catch(() => undefined);
+            }
+            return Promise.resolve();
+          })
+        );
 
-    await db.lesson.update({
-      where: { id: lesson.id },
-      data: {
-        sceneImageUrl,
-        symbols: symbolsWithImages,
-      },
+        await db.lesson.update({
+          where: { id: lesson.id },
+          data: { sceneImageUrl, symbols: symbolsWithImages },
+        });
+      } catch (err) {
+        console.error("Background image generation failed:", err);
+      }
     });
 
     revalidatePath("/");

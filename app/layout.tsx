@@ -1,3 +1,8 @@
+// Extend serverless function timeout to 300s (Vercel Pro max).
+// The generateLesson server action runs DeepSeek (~80s) synchronously,
+// then uses after() for image generation. after() also uses this budget.
+export const maxDuration = 300;
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import Link from "next/link";
