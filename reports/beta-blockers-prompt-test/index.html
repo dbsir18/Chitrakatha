@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Prompt Test — Beta-Blockers (Grok Imagine)</title>
+<style>
+  @page { size: letter; margin: 0.6in; }
+
+  :root {
+    --ink: #1c1a17;
+    --muted: #6b6558;
+    --rule: #d8d2c4;
+    --paper: #fdfcf9;
+    --accent: #8a5a2b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    color: var(--ink);
+    background: var(--paper);
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  .page {
+    max-width: 7.6in;
+    margin: 0 auto;
+    padding: 0.5in 0;
+  }
+
+  .page + .page {
+    page-break-before: always;
+    border-top: 1px solid var(--rule);
+  }
+
+  header.doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+
+  header.doc-header h1 {
+    font-size: 21px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+
+  header.doc-header .meta {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .label {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 4px 0;
+  }
+
+  section { margin-bottom: 18px; }
+
+  .story p {
+    margin: 0 0 8px 0;
+  }
+
+  figure { margin: 0 0 6px 0; }
+  figure img {
+    width: 100%;
+    display: block;
+    border: 1px solid var(--rule);
+  }
+  figcaption {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .verdict {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5px;
+    color: var(--ink);
+    background: #f3efe4;
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    margin: 0 0 18px 0;
+  }
+  .verdict strong { color: var(--accent); }
+
+  .legend-groups {
+    columns: 2;
+    column-gap: 24px;
+  }
+
+  ol.legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: item;
+  }
+  ol.legend li {
+    counter-increment: item;
+    display: flex;
+    gap: 6px;
+    margin-bottom: 7px;
+    break-inside: avoid;
+    font-size: 11px;
+  }
+  ol.legend li::before {
+    content: counter(item) ".";
+    color: var(--muted);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.legend li .miss::before {
+    content: "— ";
+  }
+  ol.legend li b { font-weight: 700; }
+  ol.legend li.miss {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  pre.prompt {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 9.6px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    background: #f6f4ee;
+    border: 1px solid var(--rule);
+    padding: 12px 14px;
+    margin: 0;
+  }
+
+  .footer-note {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 16px;
+    border-top: 1px solid var(--rule);
+    padding-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="page">
+    <header class="doc-header">
+      <h1>Prompt Density Test — Beta-Blockers</h1>
+      <div class="meta">
+        Model: Grok Imagine · Aspect ratio: wide (16:9-ish)<br />
+        Purpose: validate symbol density &amp; legibility for the Chitrakatha pipeline
+      </div>
+    </header>
+
+    <div class="verdict">
+      <strong>Result:</strong> 16–17 of 18 legend items are independently recoverable from the image alone.
+      A portrait-aspect first attempt on the same prompt recovered only ~5–6 of 18 — aspect ratio, not raw
+      model capability, was the dominant variable.
+    </div>
+
+    <section class="story">
+      <p class="label">The Story</p>
+      <p>
+        Welcome to the lobby of the <b>Beta Hall Philharmonic</b>. Every night, an over-eager conductor
+        tries to drive the orchestra faster and harder than it can safely go — exactly what an
+        overstimulated heart does under catecholamine drive. A pair of calm ushers move in: one dims the
+        houselights (blocking the signal), the other holds up a slowing metronome (falling heart rate),
+        while the grandfather clock behind them ticks in slow motion (falling contractility).
+      </p>
+      <p>
+        Around the symmetric marble staircase, more of the story unfolds: a velvet rope keeps some ushers
+        working only the brass section (cardioselective agents sparing the lungs), while a less careful
+        usher ropes off the woodwinds too (non-selective agents also hitting the airways). A fast-moving
+        usher sprints through everything and is gone in seconds (esmolol's ultra-short action). Two ushers
+        wearing alpha and beta badges gently attend to a wheelchair-bound patron (mixed-antagonists treating
+        heart failure, very carefully). Around the edges of the room: a man warms cold hands by the fire,
+        another slumps fatigued under a blanket, a chalkboard tracks rising lipids next to a slice of cake,
+        a "Survivors" table toasts a second chance after a heart attack, a migraine sufferer wears ear
+        protection, a nervous violinist is calmed before a solo, and an eye doctor administers drops beneath
+        a glowing eye chart.
+      </p>
+    </section>
+
+    <section>
+      <p class="label">Generated Image</p>
+      <figure>
+        <img src="./image.png" alt="Grok Imagine render of the Beta Hall Philharmonic scene" />
+        <figcaption>Grok Imagine, wide aspect ratio, single prompt (verbatim on page 2), no edits.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <div class="page">
+    <header class="doc-header">
+      <h1>Legend &amp; Prompt</h1>
+      <div class="meta">Beta-Blockers · page 2 of 2</div>
+    </header>
+
+    <section>
+      <p class="label">Legend — 18 Symbols</p>
+      <div class="legend-groups">
+        <ol class="legend">
+          <li><span><b>Leaping conductor</b>: an overstimulated heart driven by catecholamines</span></li>
+          <li><span><b>Dimmer-switch usher</b>: beta-blockade, the core mechanism</span></li>
+          <li><span><b>Slowing metronome</b>: ↓ heart rate (negative chronotropy)</span></li>
+          <li><span><b>Slow-motion pendulum clock</b>: ↓ contractility (negative inotropy)</span></li>
+          <li><span><b>Roped-off brass section</b>: cardioselective (β1) agents — metoprolol, atenolol, bisoprolol</span></li>
+          <li><span><b>Roped-off woodwind section</b>: non-selective agents also block β2 — propranolol, nadolol, timolol</span></li>
+          <li><span><b>Stop-gesture at the door</b>: contraindicated in asthma/COPD (bronchospasm risk)</span></li>
+          <li><span><b>Sprinting usher</b>: esmolol, ultra-short-acting, IV rate control</span></li>
+          <li><span><b>Alpha/beta badge pair</b>: labetalol/carvedilol, mixed alpha+beta antagonists</span></li>
+          <li><span><b>Wheelchair patron, heart badge</b>: careful titration needed in heart failure</span></li>
+          <li><span><b>Man slumped under a blanket</b>: fatigue and depression, common side effects</span></li>
+          <li><span><b>Man warming hands at the fire</b>: peripheral vasoconstriction, cold extremities</span></li>
+          <li><span><b>Bar chart + slice of cake</b>: can worsen lipid profile</span></li>
+          <li><span><b>"Survivors" table, raised glasses</b>: post-MI mortality benefit</span></li>
+          <li><span><b>Person with ear muffs</b>: migraine prophylaxis</span></li>
+          <li><span><b>Violinist calmed with water</b>: performance/situational anxiety</span></li>
+          <li><span><b>Eye drops beneath a glowing eye chart</b>: timolol for open-angle glaucoma</span></li>
+          <li class="miss"><span><b>Diabetic's silent alert bracelet</b>: masks hypoglycemia symptoms — not clearly recovered in this render</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Exact Prompt Used (verbatim, unchanged across model tests)</p>
+      <pre class="prompt">A single wide hand-painted gouache and colored-pencil storybook illustration, visible brush and pencil texture, matte finish (no glossy CGI render, no plastic 3D-render skin, no airbrushed smoothness), naturalistic varied color palette with true blacks and cool tones present (avoid an overall orange/sepia/amber color cast), soft even studio lighting with no lens flare, no bokeh blur, no vignette, ink-outlined linework with imperfect confident hand-drawn lines, characters with distinct varied faces and asymmetric expressive features, realistic hands with five fingers, symmetric wide theatrical stage-set composition, absolutely no text, letters, numbers, or watermarks anywhere in the image.
+
+Scene: the grand lobby of an ornate symphony concert hall, symmetrical marble staircases on either side framing a red-carpeted entrance, an elaborate blank stone marquee arch overhead with a stylized carved musical note emblem (no legible text). In the center, a flustered orchestra conductor mid-leap, baton raised high, sweat flying, being gently restrained by two calm ushers in matching uniforms - one usher holds a large dimmer switch glowing softly, the other holds an old brass metronome whose swinging arm is visibly slowing down. Behind them, a grandfather clock's pendulum also ticks in slow motion. To the left, a velvet VIP rope cordons off only the brass section of the orchestra (all trumpets and horns), guarded by an usher wearing a name tag shaped like a tiny heart. To the right, a second usher absentmindedly also cordons off a balcony full of wheezing wind-instrument players clutching their throats, while a asthmatic patron in the doorway is politely turned away by a doorman holding up a stop-gesture hand. Nearby, an hourglass-shaped usher character sprints past everyone else in a blur of motion lines, clearly the fastest one working the room. Two ushers stand arm-in-arm, one wearing a badge shaped like a lowercase alpha symbol and the other a beta symbol, both greeting a wheelchair-bound heart-failure patron very slowly and gently, checklist in hand. Elsewhere in the lobby: a diabetic patron's medical alert bracelet sits silent and unlit despite her hands trembling; a tired patron slumps deep into a lobby armchair, blanket over his knees; another patron rubs his own pale blue-tinted hands together for warmth near a small fireplace; a chalkboard easel displays a simple rising bar chart with no numbers, watched worriedly by a patron holding a plate of fatty food; a cheerful "survivors" table near the exit hands out celebratory drinks to smiling patrons wearing sashes; a woman with a migraine holds ear muffs to her head near a quiet side room; a nervous violinist backstage is calmed by an usher offering a glass of water before a big solo; and in a small side alcove, an ophthalmologist administers eye drops to a seated patient beneath a glowing stylized eye chart with no legible letters. Every character has a distinct face, body type, and posture - no repeated identical faces. Rich detailed background textures throughout, believable depth and perspective, single cohesive illustration style across the whole piece.</pre>
+    </section>
+
+    <p class="footer-note">Chitrakatha — internal prompt-validation report. Generated for cross-model comparison (Grok Imagine tested; GPT-Image and Midjourney pending on the same prompt + aspect ratio).</p>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContentType {
+  drug_profile
+  organism_list
+  drug_hierarchy
+  general
+}
+
+model Lesson {
+  id          String      @id @default(cuid())
+  topic       String
+  rawContent  String
+  contentType ContentType @default(general)
+
+  sceneName        String
+  setting          String
+  narrative        String
+  sceneImagePrompt String
+  sceneImageUrl    String?
+
+  symbols        Json
+  quizQuestions  Json
+
+  quizSessions QuizSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuizSession {
+  id        String   @id @default(cuid())
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  answers   Json
+  score     Int
+  total     Int
+  completedAt DateTime @default(now())
+}
+
+// The persistent "symbol universe" - one canonical visual per clinical concept
+// (e.g. "cancer" -> cracked crab) so the same symbol is reused across every
+// lesson it appears in, just like Sketchy's recurring characters.
+model SymbolLibrary {
+  id                String   @id @default(cuid())
+  conceptKey        String   @unique
+  displayName       String
+  description       String
+  imagePrompt       String   @default("")
+  category          String
+  referenceImageUrl String?
+  // text-embedding-3-small vector (number[]) over displayName+description,
+  // used for a cheap semantic-similarity backstop when the scene designer's
+  // own fuzzy text matching misses a duplicate concept, and to retrieve only
+  // the most relevant slice of a large library into future prompts.
+  embedding         Json?
+  usageCount        Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

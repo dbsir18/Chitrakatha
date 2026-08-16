@@ -1,0 +1,29 @@
+STYLE (apply to the entire image, no exceptions):
+A single wide hand-painted gouache and colored-pencil storybook illustration. Visible brush and pencil texture, hatching, and canvas grain throughout - this must read as traditionally painted, NOT as flat digital cartoon art, NOT cel-shaded, NOT flat vector illustration, NOT a glossy CGI render, NOT airbrushed-smooth plastic skin. Naturalistic varied color palette with true blacks and cool tones present (avoid an overall orange/sepia/amber cast). Soft even studio lighting, no lens flare, no bokeh blur, no vignette. Ink-outlined linework with imperfect, confident hand-drawn lines. Every character has a distinct face, age, body type, and posture - no two characters may look alike. Realistic hands with five fingers. Absolutely no legible text, letters, numbers, or watermarks anywhere in the image.
+
+FORMAT: Widescreen, 16:9 landscape composition - the image must be noticeably wider than it is tall. Do not generate a portrait or square image.
+
+SETTING: The grand lobby of an ornate symphony concert hall. Two symmetric marble staircases curve up to two separate balconies, framing a red-carpeted entrance below. A blank stone marquee arch overhead bears only a carved musical-note emblem, no text.
+
+REQUIRED ELEMENTS - include ALL 18 of the following as separate, clearly distinguishable vignettes placed around the lobby and both balconies. Treat this as a checklist: every single item must be visually present and identifiable on its own, even without a caption. No two items may be drawn to look like duplicates of each other - if two items involve a group of musicians, they must show different instruments, uniforms, and poses from one another.
+
+1. Center stage, ground level: a conductor mid-leap, baton raised high, sweat flying, wild-eyed and over-exerted.
+2. Directly beside him, one usher in uniform holds up a glowing dimmer-switch panel.
+3. Directly beside him on the other side, a second usher holds an old brass metronome with its arm visibly swinging slow.
+4. Behind the conductor, a tall grandfather clock, its pendulum frozen mid-swing to suggest slow motion.
+5. Left balcony: a brass ensemble (trumpets and French horns only) performing, cordoned off by a velvet rope, guarded by an usher wearing a small heart-shaped badge.
+6. Right balcony: a completely different woodwind ensemble (clarinets and flutes only, no brass instruments here) also cordoned off by a velvet rope, guarded by a different usher.
+7. Near the right balcony's entrance stairs, a doorman usher holds up a flat "stop" palm to a patron who is clutching his own throat as if wheezing, turning him away.
+8. Somewhere crossing the open floor, a single usher whose body is literally shaped like an hourglass, caught mid-run in a blur of motion lines - the fastest-moving figure in the whole scene.
+9. Near the center-front, two ushers stand arm in arm: one has a badge shaped like the Greek letter alpha (α), the other a badge shaped like the Greek letter beta (β).
+10. Directly next to that pair, an elderly patron in a wheelchair wears a small heart-shaped badge and is being greeted slowly and gently by them, a clipboard in hand.
+11. In a lobby armchair, a separate elderly patron sits slumped and fatigued, a blanket over his knees, eyes half-closed.
+12. Near a small fireplace, a different patron rubs his own hands together for warmth, hands tinted pale blue.
+13. On a wooden easel, a chalkboard shows a simple rising bar chart (bars only, no numbers or labels), watched by a patron holding a plate of visibly fatty food.
+14. Near the exit, three patrons wearing sashes sit at a small table, clinking celebratory glasses together, smiling.
+15. In a quiet side nook, a patron presses large ear-muffs to her head, wincing slightly.
+16. In a separate small alcove, a violinist performs while a calm usher offers them a glass of water.
+17. In a different alcove, an ophthalmologist administers eye drops to a seated patient beneath a glowing eye chart shape (no legible letters, just abstract shape blocks).
+18. Somewhere near the lobby's edge, a patron's wrist shows a medical alert bracelet, dim and unlit, while her other hand trembles slightly.
+
+FINAL CHECK: Before finishing, verify all 18 numbered elements above are present, none are merged together, none are duplicated to look identical, and the overall image is wide (16:9), not portrait or square.
