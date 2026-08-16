@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ImageIcon, LayoutGrid, Sparkles } from "lucide-react";
+import { Download, ImageIcon, LayoutGrid, Sparkles } from "lucide-react";
 import { getLesson } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,22 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
           className="flex-1 h-12 text-base"
         >
           Take the Quiz
+        </Button>
+        <Button
+          render={
+            <a
+              href={`/api/lessons/${lesson.id}/pdf`}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          }
+          variant="outline"
+          className="h-12 gap-2 text-base sm:flex-none px-4"
+          aria-label="Download PDF"
+        >
+          <Download className="size-4" />
+          PDF
         </Button>
       </div>
     </div>

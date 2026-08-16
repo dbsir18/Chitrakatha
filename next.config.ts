@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // pdf-parse uses Node.js fs to load test fixtures at import time,
-  // which breaks Next.js bundling. Opting it out makes it use native require().
-  serverExternalPackages: ["pdf-parse"],
+  // These packages use Node.js-specific APIs (fs, canvas, native modules) and
+  // must not be bundled by Next.js — they use native require() instead.
+  serverExternalPackages: ["pdf-parse", "@react-pdf/renderer"],
 };
 
 export default nextConfig;
