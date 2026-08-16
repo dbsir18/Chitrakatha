@@ -3,12 +3,14 @@ import OpenAI from "openai";
 let openaiClient: OpenAI | null = null;
 let openrouterClient: OpenAI | null = null;
 
+// Only used when LLM_MODEL is a plain OpenAI slug (e.g. "gpt-4o").
+// With the default LLM_MODEL=deepseek/deepseek-v4-flash this is never called.
 export function getOpenAI(): OpenAI {
   if (!openaiClient) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "OPENAI_API_KEY is not set. Add it to your .env file before generating a lesson."
+        "OPENAI_API_KEY is not set. Required when LLM_MODEL is an OpenAI model (e.g. gpt-4o)."
       );
     }
     openaiClient = new OpenAI({ apiKey });

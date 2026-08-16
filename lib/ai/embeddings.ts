@@ -1,17 +1,44 @@
-import { getOpenAI } from "@/lib/ai/client";
+import OpenAI from "openai";
 
-// Cheap enough (~$0.02 / 1M tokens) that using it liberally as a dedup/
-// retrieval backstop around the symbol library costs effectively nothing
-// next to a single image generation call.
-const EMBEDDING_MODEL = "text-embedding-3-small";
+// Route through OpenRouter if OPENAI_API_KEY is absent but OPENROUTER_API_KEY
+// is present. OpenRouter proxies OpenAI models, so we get the exact same
+// text-embedding-3-small output (1536 dims) without a separate OpenAI account.
+// If neither key is set, embedding calls throw and callers fall back gracefully.
+const EMBEDDING_MODEL = "openai/text-embedding-3-small";
+
+let embeddingClient: OpenAI | null = null;
+
+function getEmbeddingClient(): OpenAI {
+  if (embeddingClient) return embeddingClient;
+
+  if (process.env.OPENAI_API_KEY) {
+    embeddingClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return embeddingClient;
+  }
+
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (orKey) {
+    embeddingClient = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: orKey,
+      defaultHeaders: {
+        "HTTP-Referer": "https://chitrakatha.app",
+        "X-Title": "Chitrakatha",
+      },
+    });
+    return embeddingClient;
+  }
+
+  throw new Error(
+    "No embedding key found. Set OPENROUTER_API_KEY (or OPENAI_API_KEY) in your .env file."
+  );
+}
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-  const openai = getOpenAI();
-  const result = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts,
-  });
+  const client = getEmbeddingClient();
+  const model = process.env.OPENAI_API_KEY ? "text-embedding-3-small" : EMBEDDING_MODEL;
+  const result = await client.embeddings.create({ model, input: texts });
   return result.data.map((d) => d.embedding);
 }
 
