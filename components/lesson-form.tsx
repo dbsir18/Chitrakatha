@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileText, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
 import { generateLesson } from "@/app/actions/lessons";
-import { extractPdfContent } from "@/app/actions/pdf";
+import { cleanPdfText } from "@/lib/pdf-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,23 +113,38 @@ export function LessonForm() {
       return;
     }
     setIsPdfLoading(true);
-    const formData = new FormData();
-    formData.append("pdf", file);
-    const result = await extractPdfContent(formData);
-    setIsPdfLoading(false);
+    try {
+      // Parse entirely in the browser — no upload to server, no timeout risk.
+      // unpdf is dynamically imported so it doesn't bloat the initial bundle.
+      const { extractText } = await import("unpdf");
+      const buffer = await file.arrayBuffer();
+      const { text, totalPages } = await extractText(
+        new Uint8Array(buffer),
+        { mergePages: true }
+      );
+      const cleaned = cleanPdfText(text);
 
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
+      if (!cleaned || cleaned.length < 20) {
+        toast.error(
+          "Could not extract readable text. This PDF may be a scanned image — try copy-pasting the text manually."
+        );
+        return;
+      }
 
-    setContent(result.text);
-    setPdfFile({ name: file.name, pages: result.pageCount });
-    // Auto-populate topic from filename if empty
-    if (!topic.trim()) {
-      setTopic(file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "));
+      setContent(cleaned);
+      setPdfFile({ name: file.name, pages: totalPages });
+      if (!topic.trim()) {
+        setTopic(file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "));
+      }
+      toast.success(
+        `Extracted ${totalPages} page${totalPages === 1 ? "" : "s"} — review and edit below.`
+      );
+    } catch (err) {
+      console.error("PDF parse error:", err);
+      toast.error("Failed to read PDF. Make sure it's a valid, non-password-protected file.");
+    } finally {
+      setIsPdfLoading(false);
     }
-    toast.success(`Extracted ${result.pageCount} page${result.pageCount === 1 ? "" : "s"} — review and edit below.`);
   }
 
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {

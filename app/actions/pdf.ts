@@ -4,34 +4,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
 
-/**
- * Post-processes raw text extracted from a PDF:
- *
- * 1. Fixes ligature encoding corruption common in older academic/textbook PDFs
- *    where Type 1 font ligatures map to wrong characters:
- *      # → ff  (e#ects → effects, di#erent → different)
- *      % → fi  (e%cacy → efficacy, bene%t → benefit)
- *    We only apply these within word boundaries so we don't corrupt real
- *    # symbols (e.g. "pH #4") or % signs in actual percentages ("4.4%").
- *
- * 2. Strips internal page-break markers ("-- 1 of 5 --") that pdf-parse
- *    injects between pages.
- *
- * 3. Normalises whitespace.
- */
-function cleanPdfText(raw: string): string {
-  return raw
-    // Ligature fix: # between word chars = ff (e#ects, di#erent, a#ord)
-    .replace(/([a-z])#([a-z])/gi, "$1ff$2")
-    // Ligature fix: % between word chars = fi (e%cacy, bene%t, pro%le)
-    .replace(/([a-z])%([a-z])/gi, "$1fi$2")
-    // Strip pdf-parse page markers
-    .replace(/^--\s*\d+\s*of\s*\d+\s*--$/gm, "")
-    // Normalise line endings and collapse excessive blank lines
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
+import { cleanPdfText } from "@/lib/pdf-utils";
 
 export type ExtractPdfResult =
   | { ok: true; text: string; pageCount: number }
