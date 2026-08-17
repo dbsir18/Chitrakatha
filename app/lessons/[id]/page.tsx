@@ -6,6 +6,7 @@ import { getLesson } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImagePoller } from "@/components/image-poller";
+import { RetryImagesButton } from "@/components/retry-images-button";
 import { cn } from "@/lib/utils";
 
 const CONTENT_TYPE_LABEL: Record<string, string> = {
@@ -29,8 +30,8 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <Link href="/" className="text-sm text-muted-foreground hover:text-ink-600 w-fit">
-          ← Back to lessons
+        <Link href="/lessons" className="text-sm text-muted-foreground hover:text-ink-600 w-fit">
+          ← My Lessons
         </Link>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
@@ -59,6 +60,7 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="size-7 animate-spin" strokeWidth={1.5} />
             <p className="text-sm">Painting the scene — usually 2–4 minutes…</p>
+            <RetryImagesButton lessonId={lesson.id} />
           </div>
         )}
       </div>

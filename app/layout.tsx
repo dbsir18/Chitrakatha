@@ -6,7 +6,7 @@ export const maxDuration = 300;
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import Link from "next/link";
-import { BookOpenText } from "lucide-react";
+import { BookOpenText, History } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -48,9 +48,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Chitrakatha
               </span>
             </Link>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Memory Palaces for Medicine
-            </span>
+            <nav className="flex items-center gap-5">
+              <Link
+                href="/lessons"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-ink-600 transition-colors"
+              >
+                <History className="size-3.5" strokeWidth={1.75} />
+                My Lessons
+              </Link>
+            </nav>
           </div>
         </header>
         <main className="flex-1 flex flex-col">{children}</main>

@@ -11,7 +11,7 @@ import {
 } from "@/lib/ai/image-generator";
 import { hydrateSymbols, loadSymbolLibrary } from "@/lib/ai/symbol-library";
 import type { LessonDetail, LessonSummary, SymbolWithImage } from "@/lib/types";
-import type { QuizQuestionValue } from "@/lib/ai/schema";
+import type { ContentTypeValue, HydratedSymbol, QuizQuestionValue } from "@/lib/ai/schema";
 
 export type GenerateLessonResult =
   | { ok: true; lessonId: string }
@@ -212,4 +212,133 @@ export async function getSymbolLibraryStats(): Promise<{
     totalConcepts: rows.length,
     totalReuses: rows.reduce((sum, r) => sum + Math.max(0, r.usageCount - 1), 0),
   };
+}
+
+export type LessonWithStatus = LessonSummary & {
+  symbolsTotal: number;
+  symbolsWithImages: number;
+};
+
+export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
+  const lessons = await db.lesson.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      topic: true,
+      sceneName: true,
+      contentType: true,
+      sceneImageUrl: true,
+      createdAt: true,
+      symbols: true,
+    },
+  });
+
+  return lessons.map((l) => {
+    const symbols = l.symbols as (HydratedSymbol & { imageUrl?: string })[];
+    return {
+      id: l.id,
+      topic: l.topic,
+      sceneName: l.sceneName,
+      contentType: l.contentType as ContentTypeValue,
+      sceneImageUrl: l.sceneImageUrl,
+      createdAt: l.createdAt.toISOString(),
+      symbolsTotal: symbols.length,
+      symbolsWithImages: symbols.filter((s) => !!s.imageUrl).length,
+    };
+  });
+}
+
+export async function retryLessonImages(
+  lessonId: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const lesson = await db.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) return { ok: false, error: "Lesson not found." };
+
+    const storedSymbols = lesson.symbols as (HydratedSymbol & { imageUrl?: string })[];
+    const needsSceneImage = !lesson.sceneImageUrl;
+    const symbolsNeedingImages = storedSymbols.filter((s) => !s.imageUrl);
+
+    if (!needsSceneImage && symbolsNeedingImages.length === 0) {
+      return { ok: false, error: "All images are already generated for this lesson." };
+    }
+
+    const conceptKeys = symbolsNeedingImages.map((s) => s.conceptKey);
+    const libraryRows =
+      conceptKeys.length > 0
+        ? await db.symbolLibrary.findMany({ where: { conceptKey: { in: conceptKeys } } })
+        : [];
+
+    const lookup: LibraryLookup = new Map(
+      libraryRows.map((r) => [
+        r.conceptKey,
+        {
+          referenceImageUrl: r.referenceImageUrl,
+          displayName: r.displayName,
+          description: r.description,
+        },
+      ])
+    );
+
+    after(async () => {
+      try {
+        const [newSceneImageUrl, resolvedSymbols] = await Promise.all([
+          needsSceneImage
+            ? generateSceneImage(
+                lessonId,
+                lesson.setting,
+                storedSymbols as HydratedSymbol[]
+              ).catch((err) => {
+                console.error("Scene image retry failed:", err);
+                return null;
+              })
+            : Promise.resolve(lesson.sceneImageUrl),
+          symbolsNeedingImages.length > 0
+            ? resolveSymbolImages(symbolsNeedingImages as HydratedSymbol[], lookup)
+            : Promise.resolve([]),
+        ]);
+
+        const resolvedMap = new Map(
+          resolvedSymbols.map((r) => [r.symbol.conceptKey, r.imageUrl])
+        );
+        const mergedSymbols: SymbolWithImage[] = storedSymbols.map((s) => ({
+          ...s,
+          imageUrl: s.imageUrl || resolvedMap.get(s.conceptKey) || "",
+        }));
+
+        await Promise.all(
+          resolvedSymbols
+            .filter((r) => r.isNewLibraryEntry && r.imageUrl)
+            .map((r) =>
+              db.symbolLibrary.upsert({
+                where: { conceptKey: r.symbol.conceptKey },
+                create: {
+                  conceptKey: r.symbol.conceptKey,
+                  displayName: r.symbol.name,
+                  description: r.symbol.visualDescription,
+                  imagePrompt: r.symbol.imagePrompt,
+                  category: r.symbol.category,
+                  referenceImageUrl: r.imageUrl,
+                },
+                update: { referenceImageUrl: r.imageUrl },
+              })
+            )
+        );
+
+        await db.lesson.update({
+          where: { id: lessonId },
+          data: { sceneImageUrl: newSceneImageUrl, symbols: mergedSymbols },
+        });
+      } catch (err) {
+        console.error("Retry image generation failed:", err);
+      }
+    });
+
+    revalidatePath(`/lessons/${lessonId}`);
+    revalidatePath("/lessons");
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong.";
+    return { ok: false, error: message };
+  }
 }
