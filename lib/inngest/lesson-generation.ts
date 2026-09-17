@@ -1,4 +1,5 @@
 import { NonRetriableError } from "inngest";
+import { revalidatePath } from "next/cache";
 import { inngest } from "@/lib/inngest/client";
 import { NonRetryableImageError } from "@/lib/ai/image-generator";
 import {
@@ -14,13 +15,21 @@ import {
 } from "@/lib/ai/pipeline";
 
 /**
- * Converts a NonRetryableImageError into Inngest's NonRetriableError so the
- * run fails on the first attempt instead of retrying. Retrying a hopeless
- * generation (bad request, auth/credit problem, unusable response, timeout)
- * only re-bills the image API — the exact failure mode that burned credits
- * while the Blob upload was broken.
+ * Runs one step's work, then revalidates the lesson pages.
+ *
+ * - Converts a NonRetryableImageError into Inngest's NonRetriableError so
+ *   the run fails on the first attempt instead of retrying. Retrying a
+ *   hopeless generation (bad request, auth/credit problem, unusable
+ *   response, timeout) only re-bills the image API.
+ * - Revalidates even when the step throws, because a failed wave may still
+ *   have persisted some symbols, and the lessons list is statically
+ *   prerendered — the background run must explicitly mark it stale or it
+ *   keeps showing the state from the last user action.
  */
-async function failFast<T>(fn: () => Promise<T>): Promise<T> {
+async function runStep<T>(
+  lessonId: string,
+  fn: () => Promise<T>
+): Promise<T> {
   try {
     return await fn();
   } catch (err) {
@@ -28,6 +37,9 @@ async function failFast<T>(fn: () => Promise<T>): Promise<T> {
       throw new NonRetriableError(err.message);
     }
     throw err;
+  } finally {
+    revalidatePath("/lessons");
+    revalidatePath(`/lessons/${lessonId}`);
   }
 }
 
@@ -94,14 +106,16 @@ export const generateLessonFunction = inngest.createFunction(
     await Promise.all([
       step.run("scene", async () => {
         await refreshLessonLease(lessonId);
-        return failFast(() =>
+        return runStep(lessonId, () =>
           ensureSceneImage(lessonId, design.setting, design.symbols)
         );
       }),
       chunks.length > 0
         ? step.run("symbols-0", async () => {
             await refreshLessonLease(lessonId);
-            return failFast(() => ensureSymbolImages(lessonId, chunks[0]));
+            return runStep(lessonId, () =>
+              ensureSymbolImages(lessonId, chunks[0])
+            );
           })
         : Promise.resolve(null),
     ]);
@@ -109,13 +123,15 @@ export const generateLessonFunction = inngest.createFunction(
     for (let i = 1; i < chunks.length; i++) {
       await step.run(`symbols-${i}`, async () => {
         await refreshLessonLease(lessonId);
-        return failFast(() => ensureSymbolImages(lessonId, chunks[i]));
+        return runStep(lessonId, () => ensureSymbolImages(lessonId, chunks[i]));
       });
     }
 
     const status = await step.run("complete", async () => {
       const result = await completeLesson(lessonId);
       await releaseLesson(lessonId);
+      revalidatePath("/lessons");
+      revalidatePath(`/lessons/${lessonId}`);
       return result;
     });
 
