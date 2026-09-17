@@ -1,4 +1,6 @@
+import { NonRetriableError } from "inngest";
 import { inngest } from "@/lib/inngest/client";
+import { NonRetryableImageError } from "@/lib/ai/image-generator";
 import {
   claimLesson,
   completeLesson,
@@ -10,6 +12,24 @@ import {
   releaseLesson,
   type StoredSymbol,
 } from "@/lib/ai/pipeline";
+
+/**
+ * Converts a NonRetryableImageError into Inngest's NonRetriableError so the
+ * run fails on the first attempt instead of retrying. Retrying a hopeless
+ * generation (bad request, auth/credit problem, unusable response, timeout)
+ * only re-bills the image API — the exact failure mode that burned credits
+ * while the Blob upload was broken.
+ */
+async function failFast<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof NonRetryableImageError) {
+      throw new NonRetriableError(err.message);
+    }
+    throw err;
+  }
+}
 
 /**
  * Symbols per step. Matches the image-API concurrency limit (5), so each step
@@ -74,12 +94,14 @@ export const generateLessonFunction = inngest.createFunction(
     await Promise.all([
       step.run("scene", async () => {
         await refreshLessonLease(lessonId);
-        return ensureSceneImage(lessonId, design.setting, design.symbols);
+        return failFast(() =>
+          ensureSceneImage(lessonId, design.setting, design.symbols)
+        );
       }),
       chunks.length > 0
         ? step.run("symbols-0", async () => {
             await refreshLessonLease(lessonId);
-            return ensureSymbolImages(lessonId, chunks[0]);
+            return failFast(() => ensureSymbolImages(lessonId, chunks[0]));
           })
         : Promise.resolve(null),
     ]);
@@ -87,7 +109,7 @@ export const generateLessonFunction = inngest.createFunction(
     for (let i = 1; i < chunks.length; i++) {
       await step.run(`symbols-${i}`, async () => {
         await refreshLessonLease(lessonId);
-        return ensureSymbolImages(lessonId, chunks[i]);
+        return failFast(() => ensureSymbolImages(lessonId, chunks[i]));
       });
     }
 

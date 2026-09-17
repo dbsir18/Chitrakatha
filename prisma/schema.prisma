@@ -63,6 +63,19 @@ model QuizSession {
   completedAt DateTime @default(now())
 }
 
+// Crash-safety staging for paid image generations. Every image's bytes are
+// written here the moment they arrive from the image API — BEFORE the Blob
+// upload — so a failed upload or a retried step re-uploads the staged bytes
+// instead of re-generating (and re-billing). Keys: "lesson/<id>/scene" and
+// "library/<conceptKey>". Rows are deleted once the Blob upload succeeds;
+// the Blob store is the durable home, this table is only the safety net.
+model StagedImage {
+  key       String   @id
+  b64       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // The persistent "symbol universe" - one canonical visual per clinical concept
 // (e.g. "cancer" -> cracked crab) so the same symbol is reused across every
 // lesson it appears in, just like Sketchy's recurring characters.

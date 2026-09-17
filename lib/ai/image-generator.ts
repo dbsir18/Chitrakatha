@@ -1,5 +1,20 @@
 import { put } from "@vercel/blob";
+import { db } from "@/lib/db";
 import type { HydratedSymbol } from "@/lib/ai/schema";
+
+/**
+ * A failure a retry cannot fix — retrying would only re-bill the image API
+ * with no chance of success (bad request, auth/credit problem, unusable
+ * response, or a generation too slow to fit the serverless step budget).
+ * The Inngest layer converts this to NonRetriableError so the run fails
+ * fast instead of burning credits on retries.
+ */
+export class NonRetryableImageError extends Error {}
+
+// Must stay comfortably under the 300s serverless request budget so a step
+// can fail with a classified error (and stage nothing) instead of being
+// killed by the platform mid-generation.
+const GENERATE_TIMEOUT_MS = 240_000;
 
 // ── Shared style header ──────────────────────────────────────────────────────
 // Mirrors the STYLE block in reports/beta-blockers-prompt-test/prompt-v2.txt.
@@ -59,32 +74,53 @@ async function generateImageB64(
   role: "scene" | "symbol"
 ): Promise<string> {
   const key = getOpenRouterKey();
-  const res = await fetch("https://openrouter.ai/api/v1/images", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://chitrakatha.app",
-      "X-Title": "Chitrakatha",
-    },
-    body: JSON.stringify({
-      model: "qwen/qwen-image-3-pro",
-      prompt,
-      resolution: role === "scene" ? "2K" : "1K",
-      aspect_ratio: role === "scene" ? "16:9" : "1:1",
-      n: 1,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://openrouter.ai/api/v1/images", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://chitrakatha.app",
+        "X-Title": "Chitrakatha",
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen-image-3-pro",
+        prompt,
+        resolution: role === "scene" ? "2K" : "1K",
+        aspect_ratio: role === "scene" ? "16:9" : "1:1",
+        n: 1,
+      }),
+      signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      // A generation this slow will never fit the step budget; a retry would
+      // re-bill and time out the same way.
+      throw new NonRetryableImageError(
+        `Image generation timed out after ${GENERATE_TIMEOUT_MS / 1000}s — too slow for the serverless step budget.`
+      );
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Qwen image generation failed (${res.status}): ${body}`);
+    const message = `Qwen image generation failed (${res.status}): ${body}`;
+    // 4xx (except 429 rate-limit) will not fix themselves on a retry —
+    // retrying only re-bills. Fail the run instead.
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+      throw new NonRetryableImageError(message);
+    }
+    throw new Error(message);
   }
 
   const json = (await res.json()) as { data: { b64_json: string }[] };
   const b64 = json.data?.[0]?.b64_json;
   if (!b64) {
-    throw new Error("Qwen image generation returned no data.");
+    // The request was billed but the response is unusable; a retry would
+    // re-bill for the same shape.
+    throw new NonRetryableImageError("Qwen image generation returned no data.");
   }
   return b64;
 }
@@ -98,14 +134,51 @@ async function uploadToBlob(pathname: string, b64: string): Promise<string> {
   return url;
 }
 
+// ── Paid-image staging ───────────────────────────────────────────────────────
+// Every generated image's bytes are persisted to Postgres the moment they
+// arrive — BEFORE the Blob upload. A retried step finds the staged bytes and
+// only re-attempts the (free) upload, so each image is paid for at most once,
+// no matter what breaks downstream. Rows are deleted once the Blob upload
+// succeeds; the Blob store is the durable home.
+
+async function obtainImageB64(
+  key: string,
+  prompt: string,
+  role: "scene" | "symbol"
+): Promise<string> {
+  const staged = await db.stagedImage.findUnique({ where: { key } });
+  if (staged) return staged.b64;
+
+  const b64 = await generateImageB64(prompt, role);
+  await db.stagedImage.upsert({
+    where: { key },
+    create: { key, b64 },
+    update: { b64 },
+  });
+  return b64;
+}
+
+async function uploadStaged(
+  pathname: string,
+  key: string,
+  b64: string
+): Promise<string> {
+  const url = await uploadToBlob(pathname, b64);
+  await db.stagedImage.delete({ where: { key } }).catch(() => {
+    // Already gone — nothing to clean up.
+  });
+  return url;
+}
+
 export async function generateSceneImage(
   lessonId: string,
   setting: string,
   symbols: HydratedSymbol[]
 ): Promise<string> {
   const prompt = buildScenePrompt(setting, symbols);
-  const b64 = await generateImageB64(prompt, "scene");
-  return uploadToBlob(`lessons/${lessonId}/scene.png`, b64);
+  const key = `lesson/${lessonId}/scene`;
+  const b64 = await obtainImageB64(key, prompt, "scene");
+  return uploadStaged(`lessons/${lessonId}/scene.png`, key, b64);
 }
 
 /** Simple concurrency-limited map so we don't blow past image-API rate limits.
@@ -178,7 +251,12 @@ export async function resolveSymbolImage(
     };
   }
 
-  const b64 = await generateImageB64(buildSymbolPrompt(symbol.imagePrompt), "symbol");
-  const url = await uploadToBlob(`library/${symbol.conceptKey}.png`, b64);
+  const key = `library/${symbol.conceptKey}`;
+  const b64 = await obtainImageB64(
+    key,
+    buildSymbolPrompt(symbol.imagePrompt),
+    "symbol"
+  );
+  const url = await uploadStaged(`library/${symbol.conceptKey}.png`, key, b64);
   return { symbol, imageUrl: url, isNewLibraryEntry: true };
 }

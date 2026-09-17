@@ -132,6 +132,11 @@ export async function getLesson(id: string): Promise<LessonDetail | null> {
 
 export async function deleteLesson(id: string): Promise<void> {
   await db.lesson.delete({ where: { id } });
+  // Drop any staged (paid but never uploaded) scene bytes for this lesson.
+  // Symbol staging is library-scoped and reusable across lessons, so it stays.
+  await db.stagedImage.deleteMany({
+    where: { key: { startsWith: `lesson/${id}/` } },
+  });
   revalidatePath("/");
 }
 
