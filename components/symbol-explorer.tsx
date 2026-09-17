@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, ImageIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,28 +87,39 @@ export function SymbolExplorer({
       >
         <div className="flip-card-inner">
           <div className="flip-card-face front rounded-2xl border border-border bg-card shadow-md overflow-hidden flex flex-col">
-            <div className="relative flex-1 bg-secondary">
-              {symbol.imageUrl ? (
-                <Image
-                  src={symbol.imageUrl}
-                  alt={symbol.name}
-                  fill
-                  className="object-cover"
-                  sizes="600px"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  <ImageIcon className="size-10" strokeWidth={1.5} />
+            {symbol.imageUrl ? (
+              <>
+                <div className="relative flex-1 bg-secondary">
+                  <Image
+                    src={symbol.imageUrl}
+                    alt={symbol.name}
+                    fill
+                    className="object-cover"
+                    sizes="600px"
+                  />
                 </div>
-              )}
-            </div>
-            <div className="flex flex-col items-center gap-2 p-4 text-center">
-              <Badge variant="outline" className="text-[10px]">
-                {CATEGORY_LABEL[symbol.category] ?? symbol.category}
-              </Badge>
-              <p className="font-heading font-semibold text-lg text-ink-900">{symbol.name}</p>
-              <p className="text-xs text-muted-foreground">Tap to reveal the fact</p>
-            </div>
+                <div className="flex flex-col items-center gap-2 p-4 text-center">
+                  <Badge variant="outline" className="text-[10px]">
+                    {CATEGORY_LABEL[symbol.category] ?? symbol.category}
+                  </Badge>
+                  <p className="font-heading font-semibold text-lg text-ink-900">{symbol.name}</p>
+                  <p className="text-xs text-muted-foreground">Tap to reveal the fact</p>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                <Badge variant="outline" className="text-[10px]">
+                  {CATEGORY_LABEL[symbol.category] ?? symbol.category}
+                </Badge>
+                <p className="font-heading font-semibold text-2xl text-ink-900 leading-snug">
+                  {symbol.name}
+                </p>
+                <p className="text-sm text-ink-700/80 leading-relaxed">
+                  {symbol.visualDescription}
+                </p>
+                <p className="text-xs text-muted-foreground">Tap to reveal the fact</p>
+              </div>
+            )}
           </div>
 
           <div className="flip-card-face back rounded-2xl border border-gold-400/60 bg-ink-50 shadow-md overflow-hidden flex flex-col items-center justify-center p-8 text-center gap-4">

@@ -7,11 +7,9 @@ import {
   completeLesson,
   ensureDesign,
   ensureSceneImage,
-  ensureSymbolImages,
   markLessonFailed,
   refreshLessonLease,
   releaseLesson,
-  type StoredSymbol,
 } from "@/lib/ai/pipeline";
 
 /**
@@ -21,8 +19,8 @@ import {
  *   the run fails on the first attempt instead of retrying. Retrying a
  *   hopeless generation (bad request, auth/credit problem, unusable
  *   response, timeout) only re-bills the image API.
- * - Revalidates even when the step throws, because a failed wave may still
- *   have persisted some symbols, and the lessons list is statically
+ * - Revalidates even when the step throws, because a failed pass may still
+ *   have persisted partial work, and the lessons list is statically
  *   prerendered — the background run must explicitly mark it stale or it
  *   keeps showing the state from the last user action.
  */
@@ -44,26 +42,9 @@ async function runStep<T>(
 }
 
 /**
- * Symbols per step. Matches the image-API concurrency limit (5), so each step
- * is one in-process wave of generation — small enough to fit comfortably
- * inside a single serverless invocation, and a retry of the step only pays
- * for the symbols that are still missing.
- */
-const SYMBOLS_PER_STEP = 5;
-
-function chunkSymbols(symbols: StoredSymbol[], size: number): StoredSymbol[][] {
-  const chunks: StoredSymbol[][] = [];
-  for (let i = 0; i < symbols.length; i += size) {
-    chunks.push(symbols.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
  * Durable lesson generation. Every step persists its result before the next
  * one begins, and every step re-checks the DB, so retries, crashes, and
- * replays never re-pay for completed work. Step IDs are derived from the
- * memoized design output, which keeps them deterministic across replays.
+ * replays never re-pay for completed work.
  *
  * The lease is claimed for the run and refreshed by every step, which keeps
  * the lesson page's poller (the fallback executor) from overlapping this
@@ -99,33 +80,12 @@ export const generateLessonFunction = inngest.createFunction(
       return ensureDesign(lessonId);
     });
 
-    const chunks = chunkSymbols(design.symbols, SYMBOLS_PER_STEP);
-
-    // The scene image and the first symbol wave run in parallel; each
-    // persists independently the moment it lands.
-    await Promise.all([
-      step.run("scene", async () => {
-        await refreshLessonLease(lessonId);
-        return runStep(lessonId, () =>
-          ensureSceneImage(lessonId, design.setting, design.symbols)
-        );
-      }),
-      chunks.length > 0
-        ? step.run("symbols-0", async () => {
-            await refreshLessonLease(lessonId);
-            return runStep(lessonId, () =>
-              ensureSymbolImages(lessonId, chunks[0])
-            );
-          })
-        : Promise.resolve(null),
-    ]);
-
-    for (let i = 1; i < chunks.length; i++) {
-      await step.run(`symbols-${i}`, async () => {
-        await refreshLessonLease(lessonId);
-        return runStep(lessonId, () => ensureSymbolImages(lessonId, chunks[i]));
-      });
-    }
+    await step.run("scene", async () => {
+      await refreshLessonLease(lessonId);
+      return runStep(lessonId, () =>
+        ensureSceneImage(lessonId, design.setting, design.symbols)
+      );
+    });
 
     const status = await step.run("complete", async () => {
       const result = await completeLesson(lessonId);

@@ -164,7 +164,6 @@ export async function getSymbolLibraryStats(): Promise<{
 
 export type LessonWithStatus = LessonSummary & {
   symbolsTotal: number;
-  symbolsWithImages: number;
 };
 
 export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
@@ -183,7 +182,7 @@ export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
   });
 
   return lessons.map((l) => {
-    const symbols = l.symbols as (HydratedSymbol & { imageUrl?: string })[];
+    const symbols = l.symbols as HydratedSymbol[];
     return {
       id: l.id,
       topic: l.topic,
@@ -193,7 +192,6 @@ export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
       status: l.status,
       createdAt: l.createdAt.toISOString(),
       symbolsTotal: symbols.length,
-      symbolsWithImages: symbols.filter((s) => !!s.imageUrl).length,
     };
   });
 }

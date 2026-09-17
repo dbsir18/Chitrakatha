@@ -1,7 +1,7 @@
 import type { ContentTypeValue, HydratedSymbol, QuizQuestionValue } from "@/lib/ai/schema";
 
 export type SymbolWithImage = HydratedSymbol & {
-  imageUrl: string;
+  imageUrl?: string;
 };
 
 export type LessonStatusValue = "designing" | "painting" | "ready" | "failed";

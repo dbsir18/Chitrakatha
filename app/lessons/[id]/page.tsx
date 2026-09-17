@@ -23,7 +23,6 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
 
   const symbols = lesson.symbols;
   const designed = symbols.length > 0; // the design phase produced the symbol list
-  const painted = symbols.filter((s) => !!s.imageUrl).length;
   const inFlight = lesson.status === "designing" || lesson.status === "painting";
   const failed = lesson.status === "failed";
 
@@ -144,13 +143,6 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
             </p>
           </div>
         </details>
-      )}
-
-      {inFlight && designed && (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" strokeWidth={1.75} />
-          Painting symbols — {painted} of {symbols.length} done…
-        </p>
       )}
 
       {designed && (

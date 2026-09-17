@@ -42,6 +42,5 @@ export async function POST(
     status: lesson.status,
     sceneReady: !!lesson.sceneImageUrl,
     symbolsTotal: symbols.length,
-    symbolsWithImages: symbols.filter((s) => !!s.imageUrl).length,
   });
 }

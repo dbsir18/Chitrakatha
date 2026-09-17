@@ -18,7 +18,7 @@ const GENERATE_TIMEOUT_MS = 240_000;
 
 // ── Shared style header ──────────────────────────────────────────────────────
 // Mirrors the STYLE block in reports/beta-blockers-prompt-test/prompt-v2.txt.
-// Applied to BOTH the full-scene and individual symbol prompts.
+// Applied to the scene prompt.
 const STYLE_BLOCK = `STYLE (apply to the entire image, no exceptions):
 A single wide hand-painted gouache and colored-pencil storybook illustration. Visible brush and pencil texture, hatching, and canvas grain throughout — this must read as traditionally painted, NOT flat digital cartoon art, NOT cel-shaded, NOT flat vector illustration, NOT a glossy CGI render, NOT airbrushed-smooth plastic skin. Naturalistic varied color palette with true blacks and cool tones present (avoid an overall orange/sepia/amber cast). Soft even studio lighting, no lens flare, no bokeh blur, no vignette. Ink-outlined linework with imperfect, confident hand-drawn lines. Every character has a distinct face, age, body type, and posture — no two characters may look alike. Realistic hands with five fingers. Absolutely no legible text, letters, numbers, or watermarks anywhere in the image.`;
 
@@ -45,17 +45,6 @@ ${elements}
 FINAL CHECK: Before finishing, verify all ${symbols.length} numbered elements above are present, none are merged together, none are duplicated to look identical, and the overall image is wide (16:9), not portrait or square.`;
 }
 
-// ── Symbol prompt builder ────────────────────────────────────────────────────
-// For individual 1:1 symbol images, we use a simpler structure:
-// STYLE + FORMAT + the symbol's own imagePrompt.
-function buildSymbolPrompt(imagePrompt: string): string {
-  return `${STYLE_BLOCK}
-
-FORMAT: Square 1:1 composition, centered subject on a plain neutral background.
-
-${imagePrompt}`;
-}
-
 function getOpenRouterKey(): string {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) {
@@ -66,9 +55,9 @@ function getOpenRouterKey(): string {
   return key;
 }
 
-// "scene" → 16:9 wide (the hero illustration), "symbol" → 1:1 square (flip-card icon).
-// The caller is responsible for building the full structured prompt via
-// buildScenePrompt() or buildSymbolPrompt() before passing it here.
+// "scene" → 16:9 wide (the hero illustration), "symbol" → 1:1 square. The
+// caller is responsible for building the full structured prompt via
+// buildScenePrompt() before passing it here.
 async function generateImageB64(
   prompt: string,
   role: "scene" | "symbol"
@@ -186,84 +175,4 @@ export async function generateSceneImage(
   const key = `lesson/${lessonId}/scene`;
   const b64 = await obtainImageB64(key, prompt, "scene");
   return uploadStaged(`lessons/${lessonId}/scene.png`, key, b64);
-}
-
-/** Simple concurrency-limited map so we don't blow past image-API rate limits.
- * Runs every item even if some reject (a per-item failure must not abandon the
- * rest of the batch), then rethrows the first error so callers can fail the
- * pass without losing the completed items' side effects. */
-export async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  let firstError: unknown = null;
-  let hadError = false;
-
-  async function worker() {
-    while (cursor < items.length) {
-      const i = cursor++;
-      try {
-        results[i] = await fn(items[i], i);
-      } catch (err) {
-        if (!hadError) {
-          firstError = err;
-          hadError = true;
-        }
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker())
-  );
-  if (hadError) throw firstError;
-  return results;
-}
-
-export type LibraryLookup = Map<
-  string,
-  { referenceImageUrl: string | null; displayName: string; description: string }
->;
-
-export type ResolvedSymbol = {
-  symbol: HydratedSymbol;
-  imageUrl: string;
-  isNewLibraryEntry: boolean;
-};
-
-/**
- * Resolves ONE symbol: if it's flagged as reused AND the library has a stored
- * image for that concept, reuse that exact CDN URL (no API call, guarantees
- * the same crab-means-cancer look every time). Otherwise generate a fresh
- * isolated symbol image and upload to Vercel Blob.
- *
- * THROWS on generation failure — the caller's executor (an Inngest step or
- * the after() fallback) decides whether and how to retry. Persisting the
- * resolved URL is the caller's job, so a retry never re-pays for work whose
- * result was already saved.
- */
-export async function resolveSymbolImage(
-  symbol: HydratedSymbol,
-  library: LibraryLookup
-): Promise<ResolvedSymbol> {
-  const existing = library.get(symbol.conceptKey);
-  if (symbol.isReused && existing?.referenceImageUrl) {
-    return {
-      symbol,
-      imageUrl: existing.referenceImageUrl,
-      isNewLibraryEntry: false,
-    };
-  }
-
-  const key = `library/${symbol.conceptKey}`;
-  const b64 = await obtainImageB64(
-    key,
-    buildSymbolPrompt(symbol.imagePrompt),
-    "symbol"
-  );
-  const url = await uploadStaged(`library/${symbol.conceptKey}.png`, key, b64);
-  return { symbol, imageUrl: url, isNewLibraryEntry: true };
 }

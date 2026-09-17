@@ -100,9 +100,10 @@ function titleCase(key: string): string {
 
 /**
  * Turns the model's raw symbol list into fully-hydrated symbols:
- * 1. Exact conceptKey match against the library -> copy name/description/
- *    imagePrompt from the stored entry (never trust the model to repeat
- *    them - this is both cheaper and guarantees pixel-identical continuity).
+ * 1. Exact conceptKey match against the library (checked regardless of the
+ *    model's isReused flag) -> copy name/description/imagePrompt from the
+ *    stored entry (never trust the model to repeat them - this is both
+ *    cheaper and guarantees pixel-identical continuity).
  * 2. No exact match -> embed the symbol and compare against every library
  *    entry. A close enough match means the model missed a real duplicate;
  *    treat it as reused anyway instead of paying for + generating a new image.
@@ -122,7 +123,11 @@ export async function hydrateSymbols(
   const pendingIndexes: number[] = [];
 
   rawSymbols.forEach((symbol, index) => {
-    const exact = symbol.isReused ? byKey.get(symbol.conceptKey) : undefined;
+    // Keyed lookup regardless of the model's isReused flag: a conceptKey that
+    // exists in the library is an existing concept even if the model flagged
+    // it new, so the canonical description is hydrated instead of forking a
+    // divergent copy.
+    const exact = byKey.get(symbol.conceptKey);
     if (exact) {
       results[index] = {
         symbol: {

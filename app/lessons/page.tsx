@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, Clock, ExternalLink, ImageIcon, Images, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, ExternalLink, ImageIcon, Loader2 } from "lucide-react";
 import { getLessonsWithStatus } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,9 +55,7 @@ export default async function LessonsPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {lessons.map((lesson) => {
-            const imagesComplete =
-              !!lesson.sceneImageUrl && lesson.symbolsWithImages === lesson.symbolsTotal;
-            const symbolsComplete = lesson.symbolsWithImages === lesson.symbolsTotal;
+            const imagesComplete = !!lesson.sceneImageUrl;
             const designing = lesson.status === "designing";
             const painting = lesson.status === "painting";
             const failed = lesson.status === "failed";
@@ -125,7 +123,7 @@ export default async function LessonsPage() {
                     ) : painting ? (
                       <span className="flex items-center gap-1 font-medium text-amber-600">
                         <Loader2 className="size-3.5 animate-spin" />
-                        Painting — {lesson.symbolsWithImages} / {lesson.symbolsTotal} symbols
+                        Painting the scene…
                       </span>
                     ) : (
                       <>
@@ -143,20 +141,6 @@ export default async function LessonsPage() {
                             <Clock className="size-3.5" />
                           )}
                           Scene image
-                        </span>
-
-                        {/* Symbol image status */}
-                        <span
-                          className={`flex items-center gap-1 font-medium ${
-                            symbolsComplete ? "text-emerald-600" : "text-amber-600"
-                          }`}
-                        >
-                          {symbolsComplete ? (
-                            <CheckCircle2 className="size-3.5" />
-                          ) : (
-                            <Images className="size-3.5" />
-                          )}
-                          {lesson.symbolsWithImages} / {lesson.symbolsTotal} symbols
                         </span>
                       </>
                     )}
