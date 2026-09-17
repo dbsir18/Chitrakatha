@@ -130,6 +130,13 @@ async function uploadToBlob(pathname: string, b64: string): Promise<string> {
   const { url } = await put(pathname, buffer, {
     access: "public",
     contentType: "image/png",
+    // The Blob SDK only auto-reads the unprefixed BLOB_READ_WRITE_TOKEN,
+    // but Vercel namespaces linked store variables by the store's name
+    // (this store's are BLOB1_*). Prefer the canonical name if it ever
+    // exists, else the store's namespaced one.
+    token:
+      process.env.BLOB_READ_WRITE_TOKEN ??
+      process.env.BLOB1_READ_WRITE_TOKEN,
   });
   return url;
 }
