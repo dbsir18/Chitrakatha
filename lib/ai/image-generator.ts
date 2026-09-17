@@ -108,25 +108,38 @@ export async function generateSceneImage(
   return uploadToBlob(`lessons/${lessonId}/scene.png`, b64);
 }
 
-/** Simple concurrency-limited map so we don't blow past image-API rate limits. */
-async function mapWithConcurrency<T, R>(
+/** Simple concurrency-limited map so we don't blow past image-API rate limits.
+ * Runs every item even if some reject (a per-item failure must not abandon the
+ * rest of the batch), then rethrows the first error so callers can fail the
+ * pass without losing the completed items' side effects. */
+export async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
   fn: (item: T, index: number) => Promise<R>
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let cursor = 0;
+  let firstError: unknown = null;
+  let hadError = false;
 
   async function worker() {
     while (cursor < items.length) {
       const i = cursor++;
-      results[i] = await fn(items[i], i);
+      try {
+        results[i] = await fn(items[i], i);
+      } catch (err) {
+        if (!hadError) {
+          firstError = err;
+          hadError = true;
+        }
+      }
     }
   }
 
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, () => worker())
   );
+  if (hadError) throw firstError;
   return results;
 }
 
@@ -142,32 +155,30 @@ export type ResolvedSymbol = {
 };
 
 /**
- * For each symbol: if it's flagged as reused AND we actually have that concept
- * in the library with a stored image, reuse that exact CDN URL (no API call,
- * guarantees the same crab-means-cancer look every time). Otherwise generate a
- * fresh isolated symbol image and upload to Vercel Blob.
+ * Resolves ONE symbol: if it's flagged as reused AND the library has a stored
+ * image for that concept, reuse that exact CDN URL (no API call, guarantees
+ * the same crab-means-cancer look every time). Otherwise generate a fresh
+ * isolated symbol image and upload to Vercel Blob.
+ *
+ * THROWS on generation failure — the caller's executor (an Inngest step or
+ * the after() fallback) decides whether and how to retry. Persisting the
+ * resolved URL is the caller's job, so a retry never re-pays for work whose
+ * result was already saved.
  */
-export async function resolveSymbolImages(
-  symbols: HydratedSymbol[],
+export async function resolveSymbolImage(
+  symbol: HydratedSymbol,
   library: LibraryLookup
-): Promise<ResolvedSymbol[]> {
-  return mapWithConcurrency(symbols, 5, async (symbol) => {
-    const existing = library.get(symbol.conceptKey);
-    if (symbol.isReused && existing?.referenceImageUrl) {
-      return {
-        symbol,
-        imageUrl: existing.referenceImageUrl,
-        isNewLibraryEntry: false,
-      };
-    }
+): Promise<ResolvedSymbol> {
+  const existing = library.get(symbol.conceptKey);
+  if (symbol.isReused && existing?.referenceImageUrl) {
+    return {
+      symbol,
+      imageUrl: existing.referenceImageUrl,
+      isNewLibraryEntry: false,
+    };
+  }
 
-    try {
-      const b64 = await generateImageB64(buildSymbolPrompt(symbol.imagePrompt), "symbol");
-      const url = await uploadToBlob(`library/${symbol.conceptKey}.png`, b64);
-      return { symbol, imageUrl: url, isNewLibraryEntry: true };
-    } catch (err) {
-      console.error(`Symbol image failed for "${symbol.conceptKey}":`, err);
-      return { symbol, imageUrl: "", isNewLibraryEntry: false };
-    }
-  });
+  const b64 = await generateImageB64(buildSymbolPrompt(symbol.imagePrompt), "symbol");
+  const url = await uploadToBlob(`library/${symbol.conceptKey}.png`, b64);
+  return { symbol, imageUrl: url, isNewLibraryEntry: true };
 }

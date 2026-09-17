@@ -3,13 +3,8 @@
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { designScene } from "@/lib/ai/scene-designer";
-import {
-  generateSceneImage,
-  resolveSymbolImages,
-  type LibraryLookup,
-} from "@/lib/ai/image-generator";
-import { hydrateSymbols, loadSymbolLibrary } from "@/lib/ai/symbol-library";
+import { claimLesson, hasPendingWork, processLesson, releaseLesson } from "@/lib/ai/pipeline";
+import { inngest, inngestConfigured } from "@/lib/inngest/client";
 import type { LessonDetail, LessonSummary, SymbolWithImage } from "@/lib/types";
 import type { ContentTypeValue, HydratedSymbol, QuizQuestionValue } from "@/lib/ai/schema";
 
@@ -17,6 +12,14 @@ export type GenerateLessonResult =
   | { ok: true; lessonId: string }
   | { ok: false; error: string };
 
+/**
+ * Creates the lesson row immediately and kicks generation in the background.
+ *
+ * The request does NO AI work — it cannot time out, and the user's content is
+ * saved before a single credit is spent. The lesson page polls
+ * /api/lessons/[id]/continue, which resumes the idempotent pipeline whenever
+ * a previous pass was interrupted.
+ */
 export async function generateLesson(
   topic: string,
   rawContent: string
@@ -35,107 +38,43 @@ export async function generateLesson(
   }
 
   try {
-    const { forPrompt: existingSymbols, rows: libraryRows } = await loadSymbolLibrary(
-      trimmedTopic,
-      trimmedContent
-    );
-    const design = await designScene(trimmedTopic, trimmedContent, existingSymbols);
-
-    // Fill in name/visualDescription/imagePrompt for every symbol the model
-    // flagged as reused (or that a similarity check catches it having missed),
-    // instead of trusting the model to have repeated that text itself.
-    const hydrationResults = await hydrateSymbols(design.symbols, libraryRows);
-    const hydratedSymbols = hydrationResults.map((r) => r.symbol);
-    const newConceptEmbeddings = new Map(
-      hydrationResults
-        .filter((r) => r.isNewConcept && r.embedding)
-        .map((r) => [r.symbol.conceptKey, r.embedding as number[]])
-    );
-
-    // ── Phase 1: save text content immediately, redirect user now ────────────
-    // Image generation (scene + symbols) is expensive (5–12 min for large
-    // lessons). We save the lesson with all text content first so the user
-    // can read the narrative and legend right away, then fire images in the
-    // background via after() so the HTTP response isn't held open.
     const lesson = await db.lesson.create({
       data: {
         topic: trimmedTopic,
         rawContent: trimmedContent,
-        contentType: design.contentType,
-        sceneName: design.sceneName,
-        setting: design.setting,
-        narrative: design.narrative,
-        sceneImagePrompt: design.sceneImagePrompt,
-        symbols: hydratedSymbols, // no imageUrl yet — added after image gen
-        quizQuestions: design.quizQuestions,
-        sceneImageUrl: null, // signals "images pending" to the lesson page
+        // Placeholder text fields — filled in by the design phase. The row
+        // exists so the input is durable BEFORE any paid call runs.
+        sceneName: "",
+        setting: "",
+        narrative: "",
+        sceneImagePrompt: "",
+        symbols: [],
+        quizQuestions: [],
+        status: "designing",
       },
     });
 
-    const lookup: LibraryLookup = new Map(
-      libraryRows.map((r) => [
-        r.conceptKey,
-        {
-          referenceImageUrl: r.referenceImageUrl,
-          displayName: r.displayName,
-          description: r.description,
-        },
-      ])
-    );
-
-    // ── Phase 2: image generation runs after the response is sent ────────────
-    // The lesson page polls (router.refresh every 8s) until sceneImageUrl
-    // is no longer null, then shows the painted scene.
-    after(async () => {
+    // Prefer the durable executor: hand the lesson to Inngest and return.
+    // If the send fails (e.g. the dev server isn't running), fall back to the
+    // after() executor so generation still proceeds.
+    if (inngestConfigured()) {
       try {
-        const [sceneImageUrl, resolvedSymbols] = await Promise.all([
-          generateSceneImage(lesson.id, design.setting, hydratedSymbols).catch((err) => {
-            console.error("Scene image generation failed:", err);
-            return null;
-          }),
-          resolveSymbolImages(hydratedSymbols, lookup),
-        ]);
-
-        const symbolsWithImages: SymbolWithImage[] = resolvedSymbols.map((r) => ({
-          ...r.symbol,
-          imageUrl: r.imageUrl,
-        }));
-
-        await Promise.all(
-          resolvedSymbols.map((r) => {
-            if (r.isNewLibraryEntry && r.imageUrl) {
-              return db.symbolLibrary.upsert({
-                where: { conceptKey: r.symbol.conceptKey },
-                create: {
-                  conceptKey: r.symbol.conceptKey,
-                  displayName: r.symbol.name,
-                  description: r.symbol.visualDescription,
-                  imagePrompt: r.symbol.imagePrompt,
-                  category: r.symbol.category,
-                  referenceImageUrl: r.imageUrl,
-                  embedding: newConceptEmbeddings.get(r.symbol.conceptKey) ?? undefined,
-                },
-                update: { referenceImageUrl: r.imageUrl },
-              });
-            }
-            if (!r.isNewLibraryEntry && r.imageUrl) {
-              return db.symbolLibrary
-                .update({
-                  where: { conceptKey: r.symbol.conceptKey },
-                  data: { usageCount: { increment: 1 } },
-                })
-                .catch(() => undefined);
-            }
-            return Promise.resolve();
-          })
-        );
-
-        await db.lesson.update({
-          where: { id: lesson.id },
-          data: { sceneImageUrl, symbols: symbolsWithImages },
-        });
+        await inngest.send({ name: "lesson/generate", data: { lessonId: lesson.id } });
+        revalidatePath("/");
+        return { ok: true, lessonId: lesson.id };
       } catch (err) {
-        console.error("Background image generation failed:", err);
+        console.error("Inngest event send failed, using after() fallback:", err);
+      }
+    }
+
+    after(async () => {
+      if (!(await claimLesson(lesson.id))) return;
+      try {
+        await processLesson(lesson.id);
+      } catch (err) {
+        console.error("Lesson generation pass failed:", err);
+      } finally {
+        await releaseLesson(lesson.id);
       }
     });
 
@@ -144,7 +83,7 @@ export async function generateLesson(
   } catch (err) {
     console.error("generateLesson failed:", err);
     const message =
-      err instanceof Error ? err.message : "Something went wrong generating the lesson.";
+      err instanceof Error ? err.message : "Something went wrong creating the lesson.";
     return { ok: false, error: message };
   }
 }
@@ -158,12 +97,14 @@ export async function getLessons(): Promise<LessonSummary[]> {
       sceneName: true,
       contentType: true,
       sceneImageUrl: true,
+      status: true,
       createdAt: true,
     },
   });
 
   return lessons.map((l) => ({
     ...l,
+    sceneName: l.sceneName || l.topic,
     createdAt: l.createdAt.toISOString(),
   }));
 }
@@ -175,9 +116,11 @@ export async function getLesson(id: string): Promise<LessonDetail | null> {
   return {
     id: lesson.id,
     topic: lesson.topic,
-    sceneName: lesson.sceneName,
+    sceneName: lesson.sceneName || lesson.topic,
     contentType: lesson.contentType,
     sceneImageUrl: lesson.sceneImageUrl,
+    status: lesson.status,
+    error: lesson.error,
     createdAt: lesson.createdAt.toISOString(),
     rawContent: lesson.rawContent,
     setting: lesson.setting,
@@ -228,6 +171,7 @@ export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
       sceneName: true,
       contentType: true,
       sceneImageUrl: true,
+      status: true,
       createdAt: true,
       symbols: true,
     },
@@ -238,9 +182,10 @@ export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
     return {
       id: l.id,
       topic: l.topic,
-      sceneName: l.sceneName,
+      sceneName: l.sceneName || l.topic,
       contentType: l.contentType as ContentTypeValue,
       sceneImageUrl: l.sceneImageUrl,
+      status: l.status,
       createdAt: l.createdAt.toISOString(),
       symbolsTotal: symbols.length,
       symbolsWithImages: symbols.filter((s) => !!s.imageUrl).length,
@@ -248,89 +193,47 @@ export async function getLessonsWithStatus(): Promise<LessonWithStatus[]> {
   });
 }
 
-export async function retryLessonImages(
+/**
+ * Manual resume: force-claims the lease and re-runs the idempotent pipeline.
+ * Only regenerates what is missing — completed work is never re-paid.
+ */
+export async function resumeLesson(
   lessonId: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const lesson = await db.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson) return { ok: false, error: "Lesson not found." };
-
-    const storedSymbols = lesson.symbols as (HydratedSymbol & { imageUrl?: string })[];
-    const needsSceneImage = !lesson.sceneImageUrl;
-    const symbolsNeedingImages = storedSymbols.filter((s) => !s.imageUrl);
-
-    if (!needsSceneImage && symbolsNeedingImages.length === 0) {
-      return { ok: false, error: "All images are already generated for this lesson." };
+    if (!hasPendingWork(lesson)) {
+      return { ok: false, error: "Everything is already generated for this lesson." };
     }
 
-    const conceptKeys = symbolsNeedingImages.map((s) => s.conceptKey);
-    const libraryRows =
-      conceptKeys.length > 0
-        ? await db.symbolLibrary.findMany({ where: { conceptKey: { in: conceptKeys } } })
-        : [];
+    // Prefer the durable executor for the retry too — the new run's steps
+    // re-check the DB and only pay for what is still missing.
+    if (inngestConfigured()) {
+      try {
+        await inngest.send({ name: "lesson/generate", data: { lessonId } });
+        revalidatePath(`/lessons/${lessonId}`);
+        revalidatePath("/lessons");
+        return { ok: true };
+      } catch (err) {
+        console.error("Inngest event send failed, using after() fallback:", err);
+      }
+    }
 
-    const lookup: LibraryLookup = new Map(
-      libraryRows.map((r) => [
-        r.conceptKey,
-        {
-          referenceImageUrl: r.referenceImageUrl,
-          displayName: r.displayName,
-          description: r.description,
-        },
-      ])
-    );
+    // Force-claim: a human asked for this. If a pass is genuinely still
+    // running, the overlap is bounded — each pass persists per-symbol, so the
+    // worst case is one image being regenerated on the next pass.
+    if (!(await claimLesson(lessonId, true))) {
+      return { ok: false, error: "Could not claim the lesson for generation." };
+    }
 
     after(async () => {
       try {
-        const [newSceneImageUrl, resolvedSymbols] = await Promise.all([
-          needsSceneImage
-            ? generateSceneImage(
-                lessonId,
-                lesson.setting,
-                storedSymbols as HydratedSymbol[]
-              ).catch((err) => {
-                console.error("Scene image retry failed:", err);
-                return null;
-              })
-            : Promise.resolve(lesson.sceneImageUrl),
-          symbolsNeedingImages.length > 0
-            ? resolveSymbolImages(symbolsNeedingImages as HydratedSymbol[], lookup)
-            : Promise.resolve([]),
-        ]);
-
-        const resolvedMap = new Map(
-          resolvedSymbols.map((r) => [r.symbol.conceptKey, r.imageUrl])
-        );
-        const mergedSymbols: SymbolWithImage[] = storedSymbols.map((s) => ({
-          ...s,
-          imageUrl: s.imageUrl || resolvedMap.get(s.conceptKey) || "",
-        }));
-
-        await Promise.all(
-          resolvedSymbols
-            .filter((r) => r.isNewLibraryEntry && r.imageUrl)
-            .map((r) =>
-              db.symbolLibrary.upsert({
-                where: { conceptKey: r.symbol.conceptKey },
-                create: {
-                  conceptKey: r.symbol.conceptKey,
-                  displayName: r.symbol.name,
-                  description: r.symbol.visualDescription,
-                  imagePrompt: r.symbol.imagePrompt,
-                  category: r.symbol.category,
-                  referenceImageUrl: r.imageUrl,
-                },
-                update: { referenceImageUrl: r.imageUrl },
-              })
-            )
-        );
-
-        await db.lesson.update({
-          where: { id: lessonId },
-          data: { sceneImageUrl: newSceneImageUrl, symbols: mergedSymbols },
-        });
+        await processLesson(lessonId);
       } catch (err) {
-        console.error("Retry image generation failed:", err);
+        console.error("Lesson resume pass failed:", err);
+      } finally {
+        await releaseLesson(lessonId);
       }
     });
 

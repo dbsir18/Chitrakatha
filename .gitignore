@@ -66,3 +66,4 @@ reports/**/*.jpg
 next-env.d.ts
 
 /lib/generated/prisma
+.env*

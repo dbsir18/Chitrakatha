@@ -17,6 +17,17 @@ enum ContentType {
   general
 }
 
+// Lifecycle of a lesson. Existing rows default to `ready` (they were complete
+// before this enum existed); new lessons are explicitly created as `designing`.
+// `painting` means the designed text is saved and images are being filled in
+// incrementally — every paid step persists before the next one begins.
+enum LessonStatus {
+  designing
+  painting
+  ready
+  failed
+}
+
 model Lesson {
   id          String      @id @default(cuid())
   topic       String
@@ -31,6 +42,10 @@ model Lesson {
 
   symbols        Json
   quizQuestions  Json
+
+  status         LessonStatus @default(ready)
+  error          String?
+  leaseExpiresAt DateTime?
 
   quizSessions QuizSession[]
 

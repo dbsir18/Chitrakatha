@@ -4,7 +4,7 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { retryLessonImages } from "@/app/actions/lessons";
+import { resumeLesson } from "@/app/actions/lessons";
 import { cn } from "@/lib/utils";
 
 export function RetryImagesButton({
@@ -18,12 +18,12 @@ export function RetryImagesButton({
 
   async function handleRetry() {
     setLoading(true);
-    const result = await retryLessonImages(lessonId);
+    const result = await resumeLesson(lessonId);
     setLoading(false);
     if (result.ok) {
-      toast.success("Image generation queued. This page will update automatically.");
+      toast.success("Resuming generation — only the missing pieces are re-created.");
     } else {
-      toast.error(result.error ?? "Failed to queue image generation.");
+      toast.error(result.error ?? "Failed to resume generation.");
     }
   }
 
@@ -36,7 +36,7 @@ export function RetryImagesButton({
       className={cn("gap-2", className)}
     >
       <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
-      {loading ? "Queuing…" : "Retry Images"}
+      {loading ? "Queuing…" : "Retry generation"}
     </Button>
   );
 }

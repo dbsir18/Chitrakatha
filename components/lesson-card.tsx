@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ImageIcon } from "lucide-react";
+import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { LessonSummary } from "@/lib/types";
 
@@ -12,6 +12,8 @@ const CONTENT_TYPE_LABEL: Record<LessonSummary["contentType"], string> = {
 };
 
 export function LessonCard({ lesson }: { lesson: LessonSummary }) {
+  const generating = lesson.status === "designing" || lesson.status === "painting";
+
   return (
     <Link
       href={`/lessons/${lesson.id}`}
@@ -28,7 +30,11 @@ export function LessonCard({ lesson }: { lesson: LessonSummary }) {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
-            <ImageIcon className="size-8" strokeWidth={1.5} />
+            {generating ? (
+              <Loader2 className="size-8 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <ImageIcon className="size-8" strokeWidth={1.5} />
+            )}
           </div>
         )}
       </div>
@@ -40,6 +46,17 @@ export function LessonCard({ lesson }: { lesson: LessonSummary }) {
           {lesson.sceneName}
         </h3>
         <p className="text-sm text-muted-foreground">{lesson.topic}</p>
+        {generating && (
+          <p className="text-xs font-medium text-amber-600">
+            {lesson.status === "designing" ? "Designing…" : "Painting…"}
+          </p>
+        )}
+        {lesson.status === "failed" && (
+          <p className="flex items-center gap-1 text-xs font-medium text-destructive">
+            <AlertTriangle className="size-3" />
+            Needs a retry
+          </p>
+        )}
       </div>
     </Link>
   );

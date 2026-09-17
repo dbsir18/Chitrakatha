@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileText, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
@@ -11,17 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-
-const LOADING_MESSAGES = [
-  "Reading your content...",
-  "Mapping every fact to a symbol...",
-  "Designing the memory palace...",
-  "Writing the scene...",
-  "Painting the full scene...",
-  "Painting each symbol...",
-  "Writing quiz questions...",
-  "Almost there...",
-];
 
 const EXAMPLE_PRESETS = [
   {
@@ -60,39 +49,19 @@ export function LessonForm() {
   const [topic, setTopic] = useState("");
   const [content, setContent] = useState("");
   const [isPending, startTransition] = useTransition();
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pdfFile, setPdfFile] = useState<{ name: string; pages: number } | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    if (!isPending) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      return;
-    }
-
-    let i = 0;
-    intervalRef.current = setInterval(() => {
-      i = (i + 1) % LOADING_MESSAGES.length;
-      setLoadingMessage(LOADING_MESSAGES[i]);
-    }, 3200);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isPending]);
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isPending) return;
 
-    setLoadingMessage(LOADING_MESSAGES[0]);
     startTransition(async () => {
       const result = await generateLesson(topic, content);
       if (result.ok) {
-        toast.success("Your memory palace is ready.");
+        toast.success("Lesson created — generation is underway.");
         router.push(`/lessons/${result.lessonId}`);
       } else {
         toast.error(result.error);
@@ -287,7 +256,7 @@ export function LessonForm() {
             {isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                {loadingMessage}
+                Creating lesson…
               </>
             ) : (
               <>
@@ -296,12 +265,6 @@ export function LessonForm() {
               </>
             )}
           </Button>
-
-          {isPending && (
-            <p className="text-xs text-center text-muted-foreground">
-              Usually 30-90 seconds - every symbol is painted individually.
-            </p>
-          )}
         </form>
       </CardContent>
     </Card>

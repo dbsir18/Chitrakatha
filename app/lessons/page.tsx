@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, Clock, ExternalLink, ImageIcon, Images } from "lucide-react";
+import { CheckCircle2, Clock, ExternalLink, ImageIcon, Images, Loader2 } from "lucide-react";
 import { getLessonsWithStatus } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,8 +57,14 @@ export default async function LessonsPage() {
           {lessons.map((lesson) => {
             const imagesComplete =
               !!lesson.sceneImageUrl && lesson.symbolsWithImages === lesson.symbolsTotal;
-            const imagesPending = !imagesComplete;
             const symbolsComplete = lesson.symbolsWithImages === lesson.symbolsTotal;
+            const designing = lesson.status === "designing";
+            const painting = lesson.status === "painting";
+            const failed = lesson.status === "failed";
+            // Retry is for terminal states with gaps. In-flight lessons
+            // auto-resume when opened (the lesson page poller drives it), so
+            // no retry is offered mid-pass.
+            const showRetry = failed || (lesson.status === "ready" && !imagesComplete);
 
             return (
               <div
@@ -111,35 +117,49 @@ export default async function LessonsPage() {
 
                   {/* Status row */}
                   <div className="flex flex-wrap items-center gap-3 text-xs">
-                    {/* Scene image status */}
-                    <span
-                      className={`flex items-center gap-1 font-medium ${
-                        lesson.sceneImageUrl
-                          ? "text-emerald-600"
-                          : "text-amber-600"
-                      }`}
-                    >
-                      {lesson.sceneImageUrl ? (
-                        <CheckCircle2 className="size-3.5" />
-                      ) : (
-                        <Clock className="size-3.5" />
-                      )}
-                      Scene image
-                    </span>
+                    {designing ? (
+                      <span className="flex items-center gap-1 font-medium text-amber-600">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Designing your scene…
+                      </span>
+                    ) : painting ? (
+                      <span className="flex items-center gap-1 font-medium text-amber-600">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Painting — {lesson.symbolsWithImages} / {lesson.symbolsTotal} symbols
+                      </span>
+                    ) : (
+                      <>
+                        {/* Scene image status */}
+                        <span
+                          className={`flex items-center gap-1 font-medium ${
+                            lesson.sceneImageUrl
+                              ? "text-emerald-600"
+                              : "text-amber-600"
+                          }`}
+                        >
+                          {lesson.sceneImageUrl ? (
+                            <CheckCircle2 className="size-3.5" />
+                          ) : (
+                            <Clock className="size-3.5" />
+                          )}
+                          Scene image
+                        </span>
 
-                    {/* Symbol image status */}
-                    <span
-                      className={`flex items-center gap-1 font-medium ${
-                        symbolsComplete ? "text-emerald-600" : "text-amber-600"
-                      }`}
-                    >
-                      {symbolsComplete ? (
-                        <CheckCircle2 className="size-3.5" />
-                      ) : (
-                        <Images className="size-3.5" />
-                      )}
-                      {lesson.symbolsWithImages} / {lesson.symbolsTotal} symbols
-                    </span>
+                        {/* Symbol image status */}
+                        <span
+                          className={`flex items-center gap-1 font-medium ${
+                            symbolsComplete ? "text-emerald-600" : "text-amber-600"
+                          }`}
+                        >
+                          {symbolsComplete ? (
+                            <CheckCircle2 className="size-3.5" />
+                          ) : (
+                            <Images className="size-3.5" />
+                          )}
+                          {lesson.symbolsWithImages} / {lesson.symbolsTotal} symbols
+                        </span>
+                      </>
+                    )}
 
                     <span className="text-muted-foreground ml-auto">
                       {formatDate(lesson.createdAt)}
@@ -157,10 +177,10 @@ export default async function LessonsPage() {
                       <ExternalLink className="size-3" />
                       Open lesson
                     </Button>
-                    {imagesPending && (
+                    {showRetry && (
                       <RetryImagesButton lessonId={lesson.id} className="h-8 text-xs" />
                     )}
-                    {imagesComplete && (
+                    {imagesComplete && !failed && (
                       <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                         <CheckCircle2 className="size-3.5" />
                         All images ready
