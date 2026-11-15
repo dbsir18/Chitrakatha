@@ -15,18 +15,22 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
+import path from "node:path";
 import type { LessonDetail } from "@/lib/types";
 import type { SymbolWithImage } from "@/lib/types";
-import type { QuizQuestionValue } from "@/lib/ai/schema";
 
 // ── Typography ────────────────────────────────────────────────────────────────
 // @react-pdf/renderer ships Helvetica and Times-Roman as built-in fonts.
+// PT Serif is bundled locally in assets/fonts — remote Google Fonts URLs
+// (fonts.gstatic.com versioned paths) rot over time and killed PDF export once.
 Font.register({
   family: "Serif",
   fonts: [
-    { src: "https://fonts.gstatic.com/s/ptserif/v18/EJRVQgYoZZY2vCFuvAFWzr8.ttf" },
     {
-      src: "https://fonts.gstatic.com/s/ptserif/v18/EJRRQgYoZZY2vCFuvAFW9aCW.ttf",
+      src: path.join(process.cwd(), "assets/fonts/PTSerif-Regular.ttf"),
+    },
+    {
+      src: path.join(process.cwd(), "assets/fonts/PTSerif-Bold.ttf"),
       fontWeight: "bold",
     },
   ],

@@ -1,8 +1,5 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { renderToBuffer } = require("@react-pdf/renderer") as {
-  renderToBuffer: (element: React.ReactElement) => Promise<Buffer>;
-};
 import { createElement } from "react";
+import { renderToBuffer } from "@react-pdf/renderer";
 import { getLesson } from "@/app/actions/lessons";
 import { LessonPDF } from "@/components/lesson-pdf";
 
@@ -21,8 +18,12 @@ export async function GET(
   }
 
   try {
+    // LessonPDF wraps <Document> but carries its own props ({ lesson });
+    // cast to renderToBuffer's declared element type (weak-type mismatch).
     const buffer = await renderToBuffer(
-      createElement(LessonPDF, { lesson })
+      createElement(LessonPDF, { lesson }) as unknown as Parameters<
+        typeof renderToBuffer
+      >[0]
     );
 
     const filename = `${lesson.sceneName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
