@@ -91,13 +91,15 @@ const s = StyleSheet.create({
   // ── Hero image
   heroWrapper: {
     width: "100%",
-    aspectRatio: "3/2",
     borderRadius: 6,
     overflow: "hidden",
     marginBottom: 16,
     backgroundColor: "#e7e5e4",
   },
-  heroImage: { width: "100%", height: "100%", objectFit: "cover" },
+  // Width-only: react-pdf scales the height by the image's natural aspect
+  // ratio, so the full wide scene is visible — a fixed 3:2 box with
+  // objectFit "cover" cropped the sides of every scene.
+  heroImage: { width: "100%", objectFit: "contain" },
   // ── Story
   sectionLabel: {
     fontSize: 7,
