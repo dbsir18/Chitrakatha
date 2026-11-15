@@ -121,7 +121,7 @@ export const SceneDesignSchema = z.object({
   narrative: z
     .string()
     .describe(
-      "A 2-3 paragraph story told as a CAUSAL CHAIN: one event triggers the next, characters interact and visibly react to each other, and the chain escalates toward a mini-climax or punchline. Every symbol from `symbols` must be mentioned in the exact order it appears in the array - but each symbol appears because the previous one's action CAUSED the encounter, never as a static exhibit (never 'beside him stands...', 'next up...', 'you can also see...'). Absurd, funny, and memorable."
+      "A 2-3 paragraph story told as a CAUSAL CHAIN: one event triggers the next, characters interact and visibly react to each other, and the chain escalates toward a mini-climax or punchline. Every symbol from `symbols` must be mentioned in the exact order it appears in the array - but each symbol appears because the previous one's action CAUSED the encounter, never as a static exhibit (never 'beside him stands...', 'next up...', 'you can also see...'). Bold (**name**) each symbol's name the first time the story introduces it - the renderers display real bold, never literal asterisks. Absurd, funny, and memorable."
     ),
   sceneImagePrompt: z
     .string()

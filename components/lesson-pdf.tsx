@@ -16,6 +16,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import path from "node:path";
+import { parseInlineMarkdown } from "@/lib/markdown";
 import type { LessonDetail } from "@/lib/types";
 import type { SymbolWithImage } from "@/lib/types";
 
@@ -156,6 +157,36 @@ function Footer({ pageNum, total, sceneName }: { pageNum: number; total: number;
   );
 }
 
+/** Renders LLM prose with inline markdown (**bold** / *italic*) as real
+ * styled text instead of literal asterisks. */
+function MarkdownText({
+  src,
+  style,
+}: {
+  src: string;
+  // One of the registered style blocks from the sheet above (s.storyText etc.).
+  style: (typeof s)[keyof typeof s];
+}) {
+  return (
+    <Text style={style}>
+      {parseInlineMarkdown(src).map((seg, i) => (
+        <Text
+          key={i}
+          style={
+            seg.bold
+              ? { fontWeight: "bold" }
+              : seg.italic
+                ? { fontStyle: "italic" }
+                : undefined
+          }
+        >
+          {seg.text}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 // ── Main document ─────────────────────────────────────────────────────────────
 export function LessonPDF({ lesson }: { lesson: LessonDetail }) {
   const symbols = lesson.symbols as SymbolWithImage[];
@@ -183,10 +214,10 @@ export function LessonPDF({ lesson }: { lesson: LessonDetail }) {
         )}
 
         <Text style={s.sectionLabel}>Setting</Text>
-        <Text style={s.storyText}>{lesson.setting}</Text>
+        <MarkdownText src={lesson.setting} style={s.storyText} />
 
         <Text style={s.sectionLabel}>Story</Text>
-        <Text style={s.storyText}>{lesson.narrative}</Text>
+        <MarkdownText src={lesson.narrative} style={s.storyText} />
 
         <Footer pageNum={1} total={2} sceneName={lesson.sceneName} />
       </Page>
@@ -205,7 +236,7 @@ export function LessonPDF({ lesson }: { lesson: LessonDetail }) {
                   {symbol.name}
                 </Text>
                 <Text style={s.legendCat}>{CATEGORY_LABEL[symbol.category] ?? symbol.category}</Text>
-                <Text style={s.legendFact}>{symbol.medicalFact}</Text>
+                <MarkdownText src={symbol.medicalFact} style={s.legendFact} />
               </View>
             </View>
           ))}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Download, ImageIcon, LayoutGrid, Loader2, Sparkles } from "lucide-react";
 import { getLesson } from "@/app/actions/lessons";
+import { MarkdownInline } from "@/components/markdown-inline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgressPoller } from "@/components/progress-poller";
@@ -119,7 +120,7 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
                         {number}.
                       </span>
                       <span className={cn(symbol.isGroupIntro && "font-semibold text-ink-900")}>
-                        {symbol.name}: {symbol.medicalFact}
+                        {symbol.name}: <MarkdownInline text={symbol.medicalFact} />
                       </span>
                     </li>
                   );
@@ -137,9 +138,11 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
             Read the full story
           </summary>
           <div className="mt-4 flex flex-col gap-4">
-            <p className="text-foreground/90 leading-relaxed">{lesson.setting}</p>
+            <p className="text-foreground/90 leading-relaxed">
+              <MarkdownInline text={lesson.setting} />
+            </p>
             <p className="text-foreground/90 leading-relaxed whitespace-pre-line">
-              {lesson.narrative}
+              <MarkdownInline text={lesson.narrative} />
             </p>
           </div>
         </details>

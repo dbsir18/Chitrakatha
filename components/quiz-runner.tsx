@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BookOpen, Flame, Trophy } from "lucide-react";
 import { saveQuizSession } from "@/app/actions/lessons";
+import { MarkdownInline } from "@/components/markdown-inline";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -119,7 +120,7 @@ export function QuizRunner({
 
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col gap-5">
         <h2 className="font-heading text-lg font-semibold text-ink-900 leading-snug">
-          {question.question}
+          <MarkdownInline text={question.question} />
         </h2>
 
         <div className="flex flex-col gap-3">
@@ -153,7 +154,7 @@ export function QuizRunner({
             <span className="font-semibold text-ink-900">
               {selected === question.correctIndex ? "Correct — " : "Not quite — "}
             </span>
-            {question.explanation}
+            <MarkdownInline text={question.explanation} />
           </div>
         )}
 
