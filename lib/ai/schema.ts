@@ -106,7 +106,7 @@ export const SceneDesignSchema = z.object({
   reasoning: z
     .string()
     .describe(
-      "Internal reasoning, not shown to the user. For each fact in the content, in order: (1) name the fact, (2) check the EXISTING SYMBOL DICTIONARY for a matching clinical concept and state whether reusing it or inventing a new one, (3) if new, name the symbol. Do this thinking FIRST, then write setting/narrative/symbols to match it exactly."
+      "Internal reasoning, not shown to the user. For each fact in the content, in order: (1) name the fact, (2) check the EXISTING SYMBOL DICTIONARY for a matching clinical concept and state whether reusing it or inventing a new one, (3) if new, name the symbol. Then (4) sketch the causal handoff chain: for each symbol in order, one clause on how the previous symbol's action causes the next encounter. Do this thinking FIRST, then write setting/narrative/symbols to match it exactly."
     ),
   sceneName: z
     .string()
@@ -121,7 +121,7 @@ export const SceneDesignSchema = z.object({
   narrative: z
     .string()
     .describe(
-      "A 2-3 paragraph story walking through the scene like a guided tour, weaving in every symbol in sequence. Absurd, funny, and memorable. Every symbol from `symbols` must be mentioned in the order it appears in the array."
+      "A 2-3 paragraph story told as a CAUSAL CHAIN: one event triggers the next, characters interact and visibly react to each other, and the chain escalates toward a mini-climax or punchline. Every symbol from `symbols` must be mentioned in the exact order it appears in the array - but each symbol appears because the previous one's action CAUSED the encounter, never as a static exhibit (never 'beside him stands...', 'next up...', 'you can also see...'). Absurd, funny, and memorable."
     ),
   sceneImagePrompt: z
     .string()

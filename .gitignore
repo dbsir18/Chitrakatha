@@ -65,5 +65,8 @@ reports/**/*.png
 reports/**/*.jpg
 next-env.d.ts
 
+# Sketchy source extracts (copyrighted reference material — never commit)
+/data/sketchy/
+
 /lib/generated/prisma
 .env*
