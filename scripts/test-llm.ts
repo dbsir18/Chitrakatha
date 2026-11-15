@@ -4,14 +4,18 @@
  * way the app does (loadSymbolLibrary), then calls the same designScene()
  * used in production. What this script prints is what a real lesson gets.
  *
- * Usage: npx tsx scripts/test-llm.ts [model-slug]
+ * Usage: npx tsx scripts/test-llm.ts [model-slug] [topic] [content-file]
  *   model-slug optionally overrides LLM_MODEL for model comparisons.
+ *   topic + content-file point the harness at your own study material
+ *   (content-file is plain text; absolute or cwd-relative).
  * Env: DATABASE_URL + OPENROUTER_API_KEY (read from .env when unset).
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const modelOverride = process.argv[2];
+const topicArg = process.argv[3];
+const contentFile = process.argv[4];
 
 // Minimal .env loader (no dotenv dependency). Must run before lib modules are
 // imported, since lib/db reads DATABASE_URL at module scope.
@@ -28,8 +32,8 @@ async function loadDotEnv() {
 
 // Test content: ACE Inhibitors — enough facts to generate 12-16 symbols,
 // covers mechanism / uses / side effects / contraindications / drug names.
-const TOPIC = "ACE Inhibitors";
-const CONTENT = `
+const TOPIC = topicArg ?? "ACE Inhibitors";
+const DEFAULT_CONTENT = `
 Drug class: ACE (Angiotensin-Converting Enzyme) Inhibitors
 Examples: captopril, enalapril, lisinopril, ramipril, benazepril (suffix: "-pril")
 
@@ -62,9 +66,15 @@ Key drug interactions:
 - K+-sparing diuretics / K+ supplements → dangerous hyperkalemia
 `.trim();
 
+const CONTENT_FILE = contentFile;
+
 async function main() {
   await loadDotEnv();
   if (modelOverride) process.env.LLM_MODEL = modelOverride;
+
+  const CONTENT = CONTENT_FILE
+    ? (await readFile(path.isAbsolute(CONTENT_FILE) ? CONTENT_FILE : path.join(process.cwd(), CONTENT_FILE), "utf8")).trim()
+    : DEFAULT_CONTENT;
 
   const { designScene } = await import("../lib/ai/scene-designer");
   const { loadSymbolLibrary } = await import("../lib/ai/symbol-library");

@@ -116,12 +116,12 @@ export const SceneDesignSchema = z.object({
   setting: z
     .string()
     .describe(
-      "A vivid 2-4 sentence description of the memory palace setting/world - one single cohesive location big enough to hold every symbol."
+      "A vivid 2-4 sentence description of the scene's location in the shared world - name the district/territory (founding one evocatively if new), place it geographically relative to established territories when nearby, and establish the ground the symbols will live on. One single cohesive location big enough to hold every symbol."
     ),
   narrative: z
     .string()
     .describe(
-      "A 2-3 paragraph story told as a CAUSAL CHAIN: one event triggers the next, characters interact and visibly react to each other, and the chain escalates toward a mini-climax or punchline. Every symbol from `symbols` must be mentioned in the exact order it appears in the array - but each symbol appears because the previous one's action CAUSED the encounter, never as a static exhibit (never 'beside him stands...', 'next up...', 'you can also see...'). Bold (**name**) each symbol's name the first time the story introduces it - the renderers display real bold, never literal asterisks. Absurd, funny, and memorable."
+      "A 2-3 paragraph story told as a CAUSAL CHAIN: one event triggers the next, characters interact and visibly react to each other, and the chain escalates toward a mini-climax or punchline. Open by anchoring the scene in the shared world (district + relation to established territories). The action mirrors the pharmacology - symbols are wielded, tripped over, and chased, never placed on display. Walk the scene in visual order: territory (background) -> central conflict: the drug-protagonist executing its mechanism against the pathology-antagonist (center) -> collateral damage: side effects, monitoring gauges, contraindications as consequences (foreground/edges). Include exactly ONE background cameo of a recurring dictionary character from a related class - atmosphere only, never a new clinical fact. Every symbol from `symbols` must be mentioned in the exact order it appears in the array - but each appears because the previous one's action CAUSED the encounter, never as a static exhibit (never 'beside him stands...', 'next up...', 'you can also see...'). Bold (**name**) each symbol's name the first time the story introduces it - the renderers display real bold, never literal asterisks. Absurd, funny, and memorable."
     ),
   sceneImagePrompt: z
     .string()
