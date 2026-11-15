@@ -5,13 +5,15 @@
  * phase (needs BLOB_READ_WRITE_TOKEN, unavailable locally), so the lesson
  * ends in the honest "painting" state with all designed text persisted.
  *
- * Usage: npx tsx scripts/test-e2e-design.ts
+ * Usage: npx tsx scripts/test-e2e-design.ts [topic] [content-file]
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-const TOPIC = "Tetracyclines";
-const CONTENT = `
+const TOPIC = process.argv[2] ?? "Tetracyclines";
+const CONTENT_FILE = process.argv[3];
+
+const DEFAULT_CONTENT = `
 Drug class: Tetracyclines
 Examples: tetracycline, doxycycline, minocycline
 
@@ -47,6 +49,9 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
+  const CONTENT = CONTENT_FILE
+    ? (await readFile(path.isAbsolute(CONTENT_FILE) ? CONTENT_FILE : path.join(process.cwd(), CONTENT_FILE), "utf8")).trim()
+    : DEFAULT_CONTENT;
   const { db } = await import("../lib/db");
   const { claimLesson, releaseLesson, ensureDesign } = await import("../lib/ai/pipeline");
 
