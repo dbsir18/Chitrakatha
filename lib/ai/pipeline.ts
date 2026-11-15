@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { designScene } from "@/lib/ai/scene-designer";
+import { refineNarrative } from "@/lib/ai/narrative-refiner";
 import { generateSceneImage } from "@/lib/ai/image-generator";
 import { hydrateSymbols, loadSymbolLibrary } from "@/lib/ai/symbol-library";
 import { embedText } from "@/lib/ai/embeddings";
@@ -101,6 +102,25 @@ export async function ensureDesign(lessonId: string): Promise<DesignState> {
   const hydrationResults = await hydrateSymbols(design.symbols, libraryRows);
   const hydratedSymbols = hydrationResults.map((r) => r.symbol);
 
+  // Story-editor pass: the design call carries the whole structured output,
+  // and its narrative tail degrades into a located checklist under that load.
+  // One focused rewrite call makes every transition causal. Failure is
+  // non-fatal — the draft is a complete story on its own.
+  let narrative = design.narrative;
+  try {
+    narrative = await refineNarrative({
+      topic: lesson.topic,
+      setting: design.setting,
+      narrative,
+      symbols: hydratedSymbols.map((s) => ({
+        name: s.name,
+        medicalFact: s.medicalFact,
+      })),
+    });
+  } catch (err) {
+    console.error("Narrative refinement failed, using the draft:", err);
+  }
+
   // Persist the designed text IMMEDIATELY: the expensive LLM result is never
   // lost to a later timeout, and the user can read it right away.
   await db.lesson.update({
@@ -109,7 +129,7 @@ export async function ensureDesign(lessonId: string): Promise<DesignState> {
       contentType: design.contentType,
       sceneName: design.sceneName,
       setting: design.setting,
-      narrative: design.narrative,
+      narrative,
       sceneImagePrompt: design.sceneImagePrompt,
       symbols: hydratedSymbols,
       quizQuestions: design.quizQuestions,

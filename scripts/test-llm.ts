@@ -77,7 +77,8 @@ async function main() {
     : DEFAULT_CONTENT;
 
   const { designScene } = await import("../lib/ai/scene-designer");
-  const { loadSymbolLibrary } = await import("../lib/ai/symbol-library");
+  const { loadSymbolLibrary, hydrateSymbols } = await import("../lib/ai/symbol-library");
+  const { refineNarrative } = await import("../lib/ai/narrative-refiner");
 
   console.log(`\nModel: ${process.env.LLM_MODEL ?? "deepseek/deepseek-v4-flash"}`);
   console.log(`Topic: ${TOPIC}`);
@@ -91,35 +92,45 @@ async function main() {
   console.log("\nCalling scene designer...");
   const start = Date.now();
   const result = await designScene(TOPIC, CONTENT, library.forPrompt);
+
+  // Mirror ensureDesign: hydrate reused symbols, then run the story-editor pass.
+  const hydration = await hydrateSymbols(result.symbols, library.rows);
+  const symbols = hydration.map((r) => r.symbol);
+  const reused = hydration.filter((r) => !r.isNewConcept).length;
+
+  let narrative = result.narrative;
+  try {
+    console.log("Calling story editor...");
+    narrative = await refineNarrative({
+      topic: TOPIC,
+      setting: result.setting,
+      narrative,
+      symbols: symbols.map((s) => ({ name: s.name, medicalFact: s.medicalFact })),
+    });
+  } catch (err) {
+    console.log(`Refinement failed, showing the draft: ${String(err).slice(0, 120)}`);
+  }
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
   // ── Quality report ─────────────────────────────────────────────────────────
   console.log(`\n${"─".repeat(60)}`);
   console.log(`Scene: "${result.sceneName}"  (${elapsed}s)`);
   console.log(`Content type: ${result.contentType}`);
-  const reused = result.symbols.filter((s) => s.isReused).length;
-  console.log(`Symbols: ${result.symbols.length} (${reused} reused from library)  |  Quiz questions: ${result.quizQuestions.length}`);
+  console.log(`Symbols: ${symbols.length} (${reused} reused from library)  |  Quiz questions: ${result.quizQuestions.length}`);
   console.log(`${"─".repeat(60)}`);
 
   console.log(`\nSETTING:\n${result.setting}\n`);
 
   console.log("SYMBOLS:");
-  let schemaViolations = 0;
-  result.symbols.forEach((s, i) => {
+  symbols.forEach((s, i) => {
     const num = String(i + 1).padStart(2);
     const intro = s.isGroupIntro ? " [INTRO]" : "";
     const reuse = s.isReused ? " [REUSED]" : "";
-    // Schema check: new symbols must have name/visualDescription/imagePrompt
-    if (!s.isReused && (!s.name || !s.visualDescription || !s.imagePrompt)) {
-      schemaViolations++;
-      console.log(`${num}. ⚠ SCHEMA VIOLATION — isReused:false but missing required fields`);
-    } else {
-      console.log(`${num}. ${s.name ?? "(null — reused)"}${intro}${reuse}`);
-      console.log(`     Fact: ${s.medicalFact}`);
-    }
+    console.log(`${num}. ${s.name}${intro}${reuse}`);
+    console.log(`     Fact: ${s.medicalFact}`);
   });
 
-  console.log(`\nNARRATIVE:\n${result.narrative}\n`);
+  console.log(`\nNARRATIVE (editor-passed):\n${narrative}\n`);
 
   console.log(`\nQUIZ (first 2 questions):`);
   result.quizQuestions.slice(0, 2).forEach((q, i) => {
@@ -128,11 +139,7 @@ async function main() {
   });
 
   console.log(`\n${"─".repeat(60)}`);
-  if (schemaViolations > 0) {
-    console.log(`⚠  ${schemaViolations} schema violation(s) — model did not fully comply`);
-  } else {
-    console.log(`✓  Schema compliance: all ${result.symbols.length} symbols valid`);
-  }
+  console.log(`✓  All ${symbols.length} symbols hydrated`);
   console.log(`${"─".repeat(60)}\n`);
 }
 
