@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, Download, ImageIcon, LayoutGrid, Loader2, Sparkles } from "lucide-react";
 import { getLesson } from "@/app/actions/lessons";
 import { MarkdownInline } from "@/components/markdown-inline";
+import { ReviewPanel } from "@/components/review-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgressPoller } from "@/components/progress-poller";
@@ -25,6 +26,7 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
   const symbols = lesson.symbols;
   const designed = symbols.length > 0; // the design phase produced the symbol list
   const inFlight = lesson.status === "designing" || lesson.status === "painting";
+  const reviewing = lesson.status === "reviewing";
   const failed = lesson.status === "failed";
 
   const half = Math.ceil(symbols.length / 2);
@@ -50,6 +52,8 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
           {lesson.sceneName}
         </h1>
       </div>
+
+      {reviewing && <ReviewPanel lessonId={lesson.id} />}
 
       {failed && lesson.error && (
         <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
@@ -86,6 +90,13 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
               <p className="text-xs text-muted-foreground/70">
                 Every step is saved as it completes — leave and come back anytime,
                 generation picks up where it left off.
+              </p>
+            </>
+          ) : reviewing ? (
+            <>
+              <ImageIcon className="size-7" strokeWidth={1.5} />
+              <p className="text-sm">
+                The scene gets painted once you approve the story.
               </p>
             </>
           ) : (

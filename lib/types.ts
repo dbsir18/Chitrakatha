@@ -4,7 +4,12 @@ export type SymbolWithImage = HydratedSymbol & {
   imageUrl?: string;
 };
 
-export type LessonStatusValue = "designing" | "painting" | "ready" | "failed";
+export type LessonStatusValue =
+  | "designing"
+  | "reviewing"
+  | "painting"
+  | "ready"
+  | "failed";
 
 export type LessonSummary = {
   id: string;

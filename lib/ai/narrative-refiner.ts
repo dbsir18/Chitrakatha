@@ -37,12 +37,19 @@ export async function refineNarrative(args: {
   setting: string;
   narrative: string;
   symbols: RefinableSymbol[];
+  /** Optional user feedback from the review gate — applied on top of the
+   * baseline causal-chain rewrite. */
+  feedback?: string;
 }): Promise<string> {
   const { client, model } = getLLMClient();
 
   const symbolList = args.symbols
     .map((s, i) => `${i + 1}. ${s.name} — encodes: ${s.medicalFact}`)
     .join("\n");
+
+  const feedbackBlock = args.feedback
+    ? `\nTHE SHOWRUNNER'S NOTE (the user reviewed this story and wants these changes applied): "${args.feedback}"\nHonor the note above while keeping every rule in this brief — the note never overrides medical accuracy, symbol order, or coverage.\n`
+    : "";
 
   const completion = await client.chat.completions.create({
     model,
@@ -56,7 +63,7 @@ SETTING (unchanged): ${args.setting}
 
 SYMBOLS, in the exact order they must appear in the story:
 ${symbolList}
-
+${feedbackBlock}
 DRAFT NARRATIVE TO REWRITE:
 """
 ${args.narrative}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, Clock, ExternalLink, ImageIcon, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, ExternalLink, ImageIcon, Loader2, PenLine } from "lucide-react";
 import { getLessonsWithStatus } from "@/app/actions/lessons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ export default async function LessonsPage() {
             const imagesComplete = !!lesson.sceneImageUrl;
             const designing = lesson.status === "designing";
             const painting = lesson.status === "painting";
+            const reviewing = lesson.status === "reviewing";
             const failed = lesson.status === "failed";
             // Retry is for terminal states with gaps. In-flight lessons
             // auto-resume when opened (the lesson page poller drives it), so
@@ -124,6 +125,11 @@ export default async function LessonsPage() {
                       <span className="flex items-center gap-1 font-medium text-amber-600">
                         <Loader2 className="size-3.5 animate-spin" />
                         Painting the scene…
+                      </span>
+                    ) : reviewing ? (
+                      <span className="flex items-center gap-1 font-medium text-amber-600">
+                        <PenLine className="size-3.5" />
+                        Story ready for your review
                       </span>
                     ) : (
                       <>

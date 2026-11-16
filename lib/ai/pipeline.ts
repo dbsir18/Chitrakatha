@@ -133,7 +133,9 @@ export async function ensureDesign(lessonId: string): Promise<DesignState> {
       sceneImagePrompt: design.sceneImagePrompt,
       symbols: hydratedSymbols,
       quizQuestions: design.quizQuestions,
-      status: "painting",
+      // The review gate: the story waits for user feedback/approval before
+      // the paid image step runs (approveStory flips this to `painting`).
+      status: "reviewing",
       error: null,
     },
   });
@@ -253,6 +255,12 @@ export async function processLesson(lessonId: string): Promise<void> {
 
   if (lesson.status === "ready" && !!lesson.sceneImageUrl) {
     return; // nothing to do
+  }
+
+  // The review gate: a designed story waits for the user. The image phase
+  // only runs after approveStory flips the status to `painting`.
+  if (lesson.status === "reviewing") {
+    return;
   }
 
   // ── Phase 1: design ──────────────────────────────────────────────────────

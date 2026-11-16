@@ -17,12 +17,14 @@ enum ContentType {
   general
 }
 
-// Lifecycle of a lesson. Existing rows default to `ready` (they were complete
-// before this enum existed); new lessons are explicitly created as `designing`.
-// `painting` means the designed text is saved and images are being filled in
-// incrementally — every paid step persists before the next one begins.
+// Lifecycle of a lesson. `designing` means the LLM text pass is running;
+// `reviewing` means the story is persisted and awaits the user's feedback or
+// approval BEFORE any image is generated (the review gate — the image is the
+// expensive, irreversible step); `painting` means the story was approved and
+// the scene image is being filled in; `ready` and `failed` are terminal.
 enum LessonStatus {
   designing
+  reviewing
   painting
   ready
   failed

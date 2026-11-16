@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { claimLesson, hasPendingWork, processLesson, releaseLesson } from "@/lib/ai/pipeline";
+import { refineNarrative } from "@/lib/ai/narrative-refiner";
 import { inngest, inngestConfigured } from "@/lib/inngest/client";
 import type { LessonDetail, LessonSummary, SymbolWithImage } from "@/lib/types";
 import type { ContentTypeValue, HydratedSymbol, QuizQuestionValue } from "@/lib/ai/schema";
@@ -238,6 +239,107 @@ export async function resumeLesson(
       } finally {
         await releaseLesson(lessonId);
       }
+    });
+
+    revalidatePath(`/lessons/${lessonId}`);
+    revalidatePath("/lessons");
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong.";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * The review gate: the user approved the story — flip to `painting` and kick
+ * the (paid) scene image phase. Mirrors generateLesson's executor choice:
+ * Inngest when configured, after() fallback otherwise.
+ */
+export async function approveStory(
+  lessonId: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const lesson = await db.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) return { ok: false, error: "Lesson not found." };
+    if (lesson.status !== "reviewing") {
+      return { ok: false, error: "Only a story awaiting review can be approved." };
+    }
+
+    await db.lesson.update({
+      where: { id: lessonId },
+      data: { status: "painting", error: null },
+    });
+
+    if (inngestConfigured()) {
+      try {
+        await inngest.send({ name: "lesson/paint", data: { lessonId } });
+        revalidatePath(`/lessons/${lessonId}`);
+        revalidatePath("/lessons");
+        return { ok: true };
+      } catch (err) {
+        console.error("Inngest paint event send failed, using after() fallback:", err);
+      }
+    }
+
+    // A human approved this — force-claim, same as resumeLesson.
+    if (!(await claimLesson(lessonId, true))) {
+      // Lease busy: flip back so the poller/user can retry the approval.
+      await db.lesson.update({ where: { id: lessonId }, data: { status: "reviewing" } });
+      return { ok: false, error: "Generation is busy — try again in a moment." };
+    }
+
+    after(async () => {
+      try {
+        await processLesson(lessonId);
+      } catch (err) {
+        console.error("Lesson paint pass failed:", err);
+      } finally {
+        await releaseLesson(lessonId);
+      }
+    });
+
+    revalidatePath(`/lessons/${lessonId}`);
+    revalidatePath("/lessons");
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong.";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * The review gate: the user left feedback on the story. One focused revision
+ * pass applies the note on top of the causal-chain rewrite, then the lesson
+ * stays in `reviewing` for another look.
+ */
+export async function reviseStory(
+  lessonId: string,
+  feedback: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const trimmed = feedback.trim();
+    if (!trimmed) {
+      return { ok: false, error: "Tell the story editor what to change." };
+    }
+
+    const lesson = await db.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) return { ok: false, error: "Lesson not found." };
+    if (lesson.status !== "reviewing") {
+      return { ok: false, error: "Only a story awaiting review can be revised." };
+    }
+
+    const symbols = (lesson.symbols as unknown as HydratedSymbol[]) ?? [];
+    const revised = await refineNarrative({
+      topic: lesson.topic,
+      setting: lesson.setting,
+      narrative: lesson.narrative,
+      symbols: symbols.map((s) => ({ name: s.name, medicalFact: s.medicalFact })),
+      feedback: trimmed,
+    });
+
+    await db.lesson.update({
+      where: { id: lessonId },
+      data: { narrative: revised },
     });
 
     revalidatePath(`/lessons/${lessonId}`);

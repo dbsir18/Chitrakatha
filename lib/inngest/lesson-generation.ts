@@ -1,5 +1,6 @@
 import { NonRetriableError } from "inngest";
 import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
 import { inngest } from "@/lib/inngest/client";
 import { NonRetryableImageError } from "@/lib/ai/image-generator";
 import {
@@ -8,6 +9,7 @@ import {
   ensureDesign,
   ensureSceneImage,
   markLessonFailed,
+  parseStoredSymbols,
   refreshLessonLease,
   releaseLesson,
 } from "@/lib/ai/pipeline";
@@ -50,6 +52,11 @@ async function runStep<T>(
  * the lesson page's poller (the fallback executor) from overlapping this
  * run; if this run dies without releasing, the lease self-expires and the
  * poller takes over.
+ *
+ * The review gate: this function ends after the design step — the story is
+ * persisted as `reviewing` and awaits the user. The scene image (the paid,
+ * irreversible step) only runs via the paint function below, triggered by
+ * the user's approval.
  */
 export const generateLessonFunction = inngest.createFunction(
   {
@@ -75,9 +82,59 @@ export const generateLessonFunction = inngest.createFunction(
     const claimed = await step.run("claim", () => claimLesson(lessonId));
     if (!claimed) return { status: "busy" };
 
-    const design = await step.run("design", async () => {
+    await step.run("design", async () => {
       await refreshLessonLease(lessonId);
       return ensureDesign(lessonId);
+    });
+
+    // The design is persisted as `reviewing` — hand back to the user.
+    await step.run("handoff", async () => {
+      await releaseLesson(lessonId);
+      revalidatePath("/lessons");
+      revalidatePath(`/lessons/${lessonId}`);
+      return "reviewing";
+    });
+
+    return { status: "reviewing" };
+  }
+);
+
+/**
+ * The image phase, triggered by the user approving the story. Loads the
+ * persisted design state and paints the scene durably — same step semantics
+ * as generation: every step re-checks the DB, so a retry never re-pays for
+ * an image that already landed.
+ */
+export const paintLessonFunction = inngest.createFunction(
+  {
+    id: "lesson-paint",
+    name: "Lesson scene painting",
+    retries: 3,
+    triggers: [{ event: "lesson/paint" }],
+    onFailure: async ({ event, error }) => {
+      const lessonId = (event.data.event.data as { lessonId?: string }).lessonId;
+      if (!lessonId) return;
+      await markLessonFailed(
+        lessonId,
+        `Scene painting failed after retries: ${error.message}`
+      );
+      await releaseLesson(lessonId);
+    },
+  },
+  async ({ event, step }) => {
+    const lessonId = (event.data as { lessonId: string }).lessonId;
+
+    // A human approved this — force-claim the lease.
+    const claimed = await step.run("claim", () => claimLesson(lessonId, true));
+    if (!claimed) return { status: "busy" };
+
+    const design = await step.run("load-design", async () => {
+      await refreshLessonLease(lessonId);
+      const lesson = await db.lesson.findUnique({ where: { id: lessonId } });
+      return {
+        setting: lesson?.setting ?? "",
+        symbols: parseStoredSymbols(lesson?.symbols ?? []),
+      };
     });
 
     await step.run("scene", async () => {

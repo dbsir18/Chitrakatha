@@ -1,6 +1,9 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest/client";
-import { generateLessonFunction } from "@/lib/inngest/lesson-generation";
+import {
+  generateLessonFunction,
+  paintLessonFunction,
+} from "@/lib/inngest/lesson-generation";
 
 /**
  * Serves the Inngest functions for remote invocation. The Inngest dev
@@ -10,5 +13,5 @@ import { generateLessonFunction } from "@/lib/inngest/lesson-generation";
  */
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateLessonFunction],
+  functions: [generateLessonFunction, paintLessonFunction],
 });
